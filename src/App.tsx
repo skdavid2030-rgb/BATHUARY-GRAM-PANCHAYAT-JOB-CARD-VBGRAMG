@@ -13,7 +13,7 @@ import { JobCardA5PrintModal } from './components/JobCardA5PrintModal';
 import { GoogleSheetSyncModal } from './components/GoogleSheetSyncModal';
 import { LoginPage } from './components/LoginPage';
 
-import { BeneficiaryRow, AppUser, AnalyticsData, VillageStat, BankMasterItem, AuditLog } from './types';
+import { BeneficiaryRow, AppUser, AnalyticsData, VillageStat, BankMasterItem, AuditLog, PERMANENT_BATHUARY_SHEET_URL } from './types';
 import { INITIAL_BENEFICIARIES } from './data/initialRecords';
 import { INITIAL_USERS } from './data/initialUsers';
 import { INITIAL_BANK_MASTER, SANSAD_LIST, VILLAGES_LIST } from './data/bankMaster';
@@ -85,9 +85,9 @@ export default function App() {
   const [syncModalInitialMode, setSyncModalInitialMode] = useState<'sheetLink' | 'paste' | 'upload'>('sheetLink');
   const [activeAuditRow, setActiveAuditRow] = useState<BeneficiaryRow | null>(null);
 
-  // Syncing state
+  // Syncing state - permanently connected to Bathuary GP Google Sheet
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
-  const [isSheetPermanentlySaved, setIsSheetPermanentlySaved] = useState<boolean>(false);
+  const [isSheetPermanentlySaved, setIsSheetPermanentlySaved] = useState<boolean>(true);
 
   // Helper to extract and sort clean sansads from records
   const updateSansadListFromRecords = (records: BeneficiaryRow[]) => {
@@ -107,61 +107,43 @@ export default function App() {
   const fetchAllData = async (forceLiveSync: boolean = false) => {
     setIsSyncing(true);
     try {
-      // 1. Check Permanent Google Sheet Configuration
-      let isLiveConfigured = false;
-      try {
-        const cfgRes = await fetch('/api/google-sheet/config');
-        if (cfgRes.ok) {
+      // Guarantee permanent sheet URL in safeStorage
+      if (!safeStorage.getItem('bathuary_google_sheet_url')) {
+        safeStorage.setItem('bathuary_google_sheet_url', PERMANENT_BATHUARY_SHEET_URL);
+      }
+
+      // Parallel fetch to load data immediately without waterfall latency
+      const [cfgRes, bRes, uRes, aRes, bmRes] = await Promise.all([
+        fetch('/api/google-sheet/config').catch(() => null),
+        fetch(forceLiveSync ? '/api/google-sheet/refresh' : '/api/beneficiaries', {
+          method: forceLiveSync ? 'POST' : 'GET',
+          headers: forceLiveSync ? { 'Content-Type': 'application/json' } : {}
+        }).catch(() => null),
+        fetch('/api/users').catch(() => null),
+        fetch('/api/audit-logs').catch(() => null),
+        fetch('/api/bank-master').catch(() => null)
+      ]);
+
+      // 1. Process Google Sheet configuration
+      if (cfgRes && cfgRes.ok) {
+        try {
           const cfgData = await cfgRes.json();
-          if (cfgData.isSaved && cfgData.config?.sheetUrl) {
+          if (cfgData.config?.sheetUrl) {
             setIsSheetPermanentlySaved(true);
             safeStorage.setItem('bathuary_google_sheet_url', cfgData.config.sheetUrl);
-            isLiveConfigured = true;
-          } else {
-            setIsSheetPermanentlySaved(false);
           }
+        } catch {
+          // ignore
         }
-      } catch {
-        // ignore
       }
 
-      // If user clicked refresh or forceLiveSync is requested and Sheet is configured, sync directly
-      let beneficiariesLoaded = false;
-      if (forceLiveSync && isLiveConfigured) {
+      // 2. Process Beneficiaries
+      if (bRes && bRes.ok) {
         try {
-          const syncRes = await fetch('/api/google-sheet/refresh', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-          });
-          if (syncRes.ok) {
-            const syncData = await syncRes.json();
-            if (syncData.status === 'success' && Array.isArray(syncData.beneficiaries) && syncData.beneficiaries.length > 0) {
-              const normalized = syncData.beneficiaries.map((b: BeneficiaryRow) => {
-                const normVillage = normalizeVillageName(b.colV, b.colB);
-                return {
-                  ...b,
-                  colV: normVillage,
-                  colB: normalizeSansadName(b.colB, normVillage) || 'SANSAD-I'
-                };
-              });
-              setBeneficiaries(normalized);
-              updateSansadListFromRecords(normalized);
-              beneficiariesLoaded = true;
-            }
-          }
-        } catch (e) {
-          console.warn("Direct live refresh fallback:", e);
-        }
-      }
-
-      // 2. Fetch Beneficiaries from cache if not already loaded from live refresh
-      if (!beneficiariesLoaded) {
-        const bRes = await fetch('/api/beneficiaries');
-        if (bRes.ok) {
           const bData = await bRes.json();
-          if (bData.beneficiaries && Array.isArray(bData.beneficiaries)) {
-            // Normalize both villages (29 canonical) and sansads (16 canonical)
-            const normalized = bData.beneficiaries.map((b: BeneficiaryRow) => {
+          const list = bData.beneficiaries;
+          if (Array.isArray(list) && list.length > 0) {
+            const normalized = list.map((b: BeneficiaryRow) => {
               const normVillage = normalizeVillageName(b.colV, b.colB);
               return {
                 ...b,
@@ -177,34 +159,39 @@ export default function App() {
               updateSansadListFromRecords(normalized);
             }
           }
+        } catch (e) {
+          console.warn("Error parsing beneficiaries:", e);
         }
       }
 
-      // 3. Fetch Users
-      const uRes = await fetch('/api/users');
-      if (uRes.ok) {
-        const uData = await uRes.json();
-        if (uData.users && Array.isArray(uData.users)) {
-          setUsers(uData.users);
-        }
+      // 3. Process Users
+      if (uRes && uRes.ok) {
+        try {
+          const uData = await uRes.json();
+          if (uData.users && Array.isArray(uData.users)) {
+            setUsers(uData.users);
+          }
+        } catch {}
       }
 
-      // 4. Fetch Audit Logs
-      const aRes = await fetch('/api/audit-logs');
-      if (aRes.ok) {
-        const aData = await aRes.json();
-        if (aData.logs && Array.isArray(aData.logs)) {
-          setAuditLogs(aData.logs);
-        }
+      // 4. Process Audit Logs
+      if (aRes && aRes.ok) {
+        try {
+          const aData = await aRes.json();
+          if (aData.logs && Array.isArray(aData.logs)) {
+            setAuditLogs(aData.logs);
+          }
+        } catch {}
       }
 
-      // 5. Fetch Bank Master
-      const bmRes = await fetch('/api/bank-master');
-      if (bmRes.ok) {
-        const bmData = await bmRes.json();
-        if (bmData.banks && Array.isArray(bmData.banks)) {
-          setBankMaster(bmData.banks);
-        }
+      // 5. Process Bank Master
+      if (bmRes && bmRes.ok) {
+        try {
+          const bmData = await bmRes.json();
+          if (bmData.banks && Array.isArray(bmData.banks)) {
+            setBankMaster(bmData.banks);
+          }
+        } catch {}
       }
     } catch (err) {
       console.warn("Backend API not reachable yet:", err);
@@ -497,28 +484,32 @@ export default function App() {
         {/* Main Content Area */}
         <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 print:max-w-none print:p-0 print:m-0 print:w-full">
           
-          {/* Zero Dummy Data Indicator: If no Google Sheet linked yet */}
+          {/* Permanent Google Sheet Connectivity Notice (Shown only during initial load if records array is loading) */}
           {beneficiaries.length === 0 && (
-            <div className="mb-6 p-5 sm:p-6 bg-gradient-to-r from-emerald-950 via-slate-900 to-indigo-950 rounded-3xl text-white shadow-xl border border-emerald-500/30 no-print">
+            <div className="mb-6 p-5 sm:p-6 bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 rounded-3xl text-white shadow-xl border border-emerald-500/30 no-print">
               <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div className="space-y-1.5 max-w-2xl">
                   <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold border border-emerald-500/40">
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    <span>Real Data Mode Active • Zero Fake Data Policy</span>
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <span>Google Sheet Permanently Linked • Bathuary GP</span>
                   </div>
-                  <h3 className="text-xl font-black text-white">
-                    Connect Official Google Sheet
+                  <h3 className="text-xl font-black text-white flex items-center gap-2">
+                    {isSyncing ? 'গুগল স্প্রেডশীট থেকে লাইভ ডাটা লোড হচ্ছে...' : 'লাইভ গুগল স্প্রেডশীট সংযোগ সক্রিয়'}
                   </h3>
                   <p className="text-xs text-slate-300 leading-relaxed">
-                    In compliance with official instructions, all placeholder and dummy records have been removed. The portal displays data exclusively from your official Google Sheet or uploaded Excel file. Connect your Google Sheet now to view live citizen data across all 29 canonical villages.
+                    বাথুয়ারী গ্রাম পঞ্চায়েতের অফিসিয়াল গুগল স্প্রেডশীট স্থায়ীভাবে সংযুক্ত রয়েছে (Permanent Link Active)। পুনরায় লিঙ্ক দেওয়ার প্রয়োজন নেই।
                   </p>
                 </div>
                 <button
-                  onClick={() => setIsSyncModalOpen(true)}
-                  className="px-5 py-3 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs sm:text-sm flex items-center gap-2 shadow-lg hover:shadow-emerald-500/25 transition-all cursor-pointer shrink-0"
+                  onClick={() => fetchAllData(true)}
+                  disabled={isSyncing}
+                  className="px-5 py-3 rounded-2xl btn-3d-sync text-white font-black text-xs sm:text-sm flex items-center gap-2 shadow-lg transition-all cursor-pointer shrink-0 disabled:opacity-50"
                 >
-                  <FileSpreadsheet className="w-4 h-4" />
-                  <span>Link Google Sheet Now</span>
+                  <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                  <span>{isSyncing ? 'Loading Live Data...' : '🔄 Re-Sync Now'}</span>
                 </button>
               </div>
             </div>

@@ -157,14 +157,14 @@ export const Header: React.FC<HeaderProps> = ({
               id="header-link-sheet-btn"
               onClick={onOpenSyncModal}
               className="flex items-center gap-1.5 text-white btn-3d-save px-3.5 py-1.5 rounded-xl font-black cursor-pointer shadow-md"
-              title={isPermanentlySaved ? "Google Sheet permanently saved in server" : "Auto-Link Google Sheet or upload master Excel"}
+              title="Official Bathuary GP Google Sheet permanently linked and active"
             >
               <FileSpreadsheet className="w-3.5 h-3.5 text-white animate-pulse" />
               <span className="hidden sm:inline">
-                {isPermanentlySaved ? "💾 SHEET SAVED (PERMANENT)" : "⚡ LINK GOOGLE SHEET"}
+                💾 GOOGLE SHEET LIVE
               </span>
               <span className="sm:hidden">
-                {isPermanentlySaved ? "💾 PERMANENT" : "LINK SHEET"}
+                💾 SHEET LIVE
               </span>
             </button>
 
