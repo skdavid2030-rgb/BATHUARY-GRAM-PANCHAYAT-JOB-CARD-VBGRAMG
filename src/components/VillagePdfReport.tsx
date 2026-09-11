@@ -583,7 +583,7 @@ export const VillagePdfReport: React.FC<VillagePdfReportProps> = ({
                   <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 print:border-slate-800 print:text-[8pt] print:p-1.5">Head Of House Hold</th>
                   <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 print:border-slate-800 print:text-[8pt] print:p-1.5">Father&apos;s/Husband&apos;s Name of HH</th>
                   <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 w-36 print:border-slate-800 print:text-[8pt] print:p-1.5">Village Name</th>
-                  <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider text-center no-print w-32">Action</th>
+                  <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider text-center no-print print:hidden action-column-header w-32" data-no-print="true">Action</th>
                 </tr>
               ) : (
                 <tr className="print:border-b-2 print:border-slate-900">
@@ -595,12 +595,12 @@ export const VillagePdfReport: React.FC<VillagePdfReportProps> = ({
                   <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 w-32 print:border-slate-800 print:text-[8pt] print:p-1.5">Village</th>
                   <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 w-28 print:border-slate-800 print:text-[8pt] print:p-1.5">Aadhaar</th>
                   <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 text-center w-24 print:border-slate-800 print:text-[8pt] print:p-1.5">e-KYC</th>
-                  <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider text-center no-print w-36">Action</th>
+                  <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider text-center no-print print:hidden action-column-header w-36" data-no-print="true">Action</th>
                 </tr>
               )}
             </thead>
             {/* SCREEN VIEW TBODY: Always renders paginatedRows for instant, ultra-fast tab switching */}
-            <tbody className="divide-y divide-slate-200 text-xs print:hidden">
+            <tbody className="divide-y divide-slate-200 text-xs screen-only-tbody no-print print:hidden" data-no-print="true">
               {paginatedRows.map((row, idx) => {
                 const absoluteIndex = pageSize === -1 ? idx + 1 : (currentPage - 1) * pageSize + idx + 1;
                 const isDone = (row.colR || '').toUpperCase() === 'YES' || (row.colR || '').toUpperCase() === 'Y';
@@ -615,12 +615,13 @@ export const VillagePdfReport: React.FC<VillagePdfReportProps> = ({
                       <td className="p-2.5 sm:p-3 font-black text-slate-950 uppercase border-r border-slate-200">{row.colAG || '—'}</td>
                       <td className="p-2.5 sm:p-3 text-slate-700 uppercase font-medium border-r border-slate-200">{row.colAF || '—'}</td>
                       <td className="p-2.5 sm:p-3 text-slate-800 font-bold border-r border-slate-200 whitespace-nowrap">{row.colV || '—'}</td>
-                      <td className="p-2.5 sm:p-3 text-center">
+                      <td className="p-2.5 sm:p-3 text-center no-print print:hidden action-column-cell" data-no-print="true">
                         <button
                           type="button"
                           onClick={() => onPrintA5Slip(row)}
-                          className="px-3 py-1.5 rounded-xl btn-3d-jobcard text-white font-black text-[11px] flex items-center justify-center gap-1 mx-auto cursor-pointer shadow-xs hover:shadow-md transition-all whitespace-nowrap"
+                          className="px-3 py-1.5 rounded-xl btn-3d-jobcard text-white font-black text-[11px] flex items-center justify-center gap-1 mx-auto cursor-pointer shadow-xs hover:shadow-md transition-all whitespace-nowrap no-print print:hidden"
                           title="Official Job Card Print"
+                          data-no-print="true"
                         >
                           <FileCheck className="w-3.5 h-3.5" />
                           <span>Job Card</span>
@@ -661,13 +662,14 @@ export const VillagePdfReport: React.FC<VillagePdfReportProps> = ({
                         {isDone ? "✓ Done" : isDead ? "Expired" : "Pending"}
                       </span>
                     </td>
-                    <td className="p-2.5 sm:p-3 text-center">
-                      <div className="flex items-center justify-center gap-1.5">
+                    <td className="p-2.5 sm:p-3 text-center no-print print:hidden action-column-cell" data-no-print="true">
+                      <div className="flex items-center justify-center gap-1.5 no-print print:hidden" data-no-print="true">
                         <button
                           type="button"
                           onClick={() => onPrintSlip(row)}
-                          className="px-2.5 py-1.5 rounded-xl btn-3d-slip text-white font-black text-[10px] flex items-center justify-center gap-1 cursor-pointer shadow-xs hover:shadow-md transition-all whitespace-nowrap"
+                          className="px-2.5 py-1.5 rounded-xl btn-3d-slip text-white font-black text-[10px] flex items-center justify-center gap-1 cursor-pointer shadow-xs hover:shadow-md transition-all whitespace-nowrap no-print print:hidden"
                           title="Print Citizen Acknowledgement Slip"
+                          data-no-print="true"
                         >
                           <Printer className="w-3 h-3" />
                           <span>Print Slip</span>
@@ -675,8 +677,9 @@ export const VillagePdfReport: React.FC<VillagePdfReportProps> = ({
                         <button
                           type="button"
                           onClick={() => onPrintA5Slip(row)}
-                          className="px-3 py-1.5 rounded-xl btn-3d-jobcard text-white font-black text-[11px] flex items-center justify-center gap-1 cursor-pointer shadow-xs hover:shadow-md transition-all whitespace-nowrap"
+                          className="px-3 py-1.5 rounded-xl btn-3d-jobcard text-white font-black text-[11px] flex items-center justify-center gap-1 cursor-pointer shadow-xs hover:shadow-md transition-all whitespace-nowrap no-print print:hidden"
                           title="Official Job Card Print (A5 Verification Certificate)"
+                          data-no-print="true"
                         >
                           <FileCheck className="w-3.5 h-3.5" />
                           <span>Job Card</span>
@@ -697,7 +700,7 @@ export const VillagePdfReport: React.FC<VillagePdfReportProps> = ({
 
             {/* PRINT VIEW TBODY: Only mounted when user triggers print to guarantee instant tab switching */}
             {isPrinting && (
-              <tbody className="hidden print:table-row-group divide-y divide-slate-400 text-[8pt] print:text-black">
+              <tbody className="print-only-tbody hidden print:table-row-group divide-y divide-slate-400 text-[8pt] print:text-black">
                 {rowsToPrint.map((row, idx) => {
                   const absoluteIndex = printScope === 'ALL' ? idx + 1 : ((currentPage - 1) * pageSize + idx + 1);
                   const isDone = (row.colR || '').toUpperCase() === 'YES' || (row.colR || '').toUpperCase() === 'Y';

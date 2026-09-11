@@ -342,8 +342,42 @@
     display: table-header-group !important;
   }
 
-  #printableVillageReport tbody {
+  #printableVillageReport tbody.screen-only-tbody,
+  #printableVillageReport .screen-only-tbody,
+  .screen-only-tbody {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    max-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  #printableVillageReport tbody.print-only-tbody,
+  #printableVillageReport .print-only-tbody,
+  .print-only-tbody {
     display: table-row-group !important;
+    visibility: visible !important;
+  }
+
+  /* ABSOLUTE GUARANTEE: Never display Action column or buttons in Village Report or ANY print page */
+  #printableVillageReport th.action-column-header,
+  #printableVillageReport td.action-column-cell,
+  th.action-column-header,
+  td.action-column-cell,
+  .action-column-header,
+  .action-column-cell,
+  [data-no-print="true"],
+  .no-print,
+  .print\:hidden {
+    display: none !important;
+    visibility: hidden !important;
+    width: 0 !important;
+    max-width: 0 !important;
+    min-width: 0 !important;
+    height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
   }
 
   #printableVillageReport tr {
