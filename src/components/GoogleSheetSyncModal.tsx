@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  FileSpreadsheet, 
-  Upload, 
-  Link2, 
-  CheckCircle2, 
-  AlertCircle, 
-  X, 
-  RefreshCw, 
+import {
+  FileSpreadsheet,
+  Upload,
+  Link2,
+  CheckCircle2,
+  AlertCircle,
+  X,
+  RefreshCw,
   ClipboardPaste,
   ArrowRight,
-  Sparkles, 
+  Sparkles,
   ExternalLink,
   Check,
   Globe,
@@ -18,7 +18,10 @@ import {
   HardDrive,
   Trash2,
   Edit3,
-  Copy
+  Copy,
+  Zap,
+  Radio,
+  Code
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { BeneficiaryRow, GoogleSheetConfig } from '../types';
@@ -31,7 +34,7 @@ interface GoogleSheetSyncModalProps {
   onClose: () => void;
   onDataImported: (rows: BeneficiaryRow[]) => void;
   currentCount: number;
-  initialMode?: 'sheetLink' | 'paste' | 'upload';
+  initialMode?: 'sheetLink' | 'appsScript' | 'paste' | 'upload';
 }
 
 export const GoogleSheetSyncModal: React.FC<GoogleSheetSyncModalProps> = ({
@@ -40,10 +43,12 @@ export const GoogleSheetSyncModal: React.FC<GoogleSheetSyncModalProps> = ({
   currentCount,
   initialMode = 'sheetLink'
 }) => {
-  const [activeMode, setActiveMode] = useState<'sheetLink' | 'paste' | 'upload'>(initialMode);
+  const [activeMode, setActiveMode] = useState<'sheetLink' | 'appsScript' | 'paste' | 'upload'>(initialMode);
   const [sheetUrl, setSheetUrl] = useState<string>(() => {
     return safeStorage.getItem('bathuary_google_sheet_url') || '';
   });
+  const [appsScriptUrl, setAppsScriptUrl] = useState<string>('');
+  const [hasCopiedScript, setHasCopiedScript] = useState<boolean>(false);
   const [autoSyncEnabled, setAutoSyncEnabled] = useState<boolean>(() => {
     return safeStorage.getItem('bathuary_auto_sync_enabled') !== 'false';
   });
@@ -56,7 +61,7 @@ export const GoogleSheetSyncModal: React.FC<GoogleSheetSyncModalProps> = ({
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
   const [importStats, setImportStats] = useState<{ rows: number; villages: number; sansads: number } | null>(null);
-  
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -70,6 +75,9 @@ export const GoogleSheetSyncModal: React.FC<GoogleSheetSyncModalProps> = ({
           setSheetUrl(data.config.sheetUrl);
           setIsPermanentlySaved(true);
           setSavedConfig(data.config);
+          if (data.config.appsScriptUrl) {
+            setAppsScriptUrl(data.config.appsScriptUrl);
+          }
           setAutoSyncEnabled(data.config.autoSync !== false);
           safeStorage.setItem('bathuary_google_sheet_url', data.config.sheetUrl);
         } else {
@@ -226,6 +234,75 @@ export const GoogleSheetSyncModal: React.FC<GoogleSheetSyncModalProps> = ({
     }
   };
 
+  // Direct Live Re-Sync from Google Sheet via backend live engine
+  const handleForceLiveRefresh = async () => {
+    setIsLoading(true);
+    setStatusMessage({
+      type: 'info',
+      text: 'গুগল শীট থেকে সরাসরি লাইভ রিফ্রেশ করা হচ্ছে (Live syncing directly from Google Sheet)...'
+    });
+    try {
+      const res = await fetch('/api/google-sheet/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }
+      });
+      const data = await res.json();
+      if (res.ok && data.status === 'success') {
+        if (Array.isArray(data.beneficiaries) && data.beneficiaries.length > 0) {
+          onDataImported(data.beneficiaries);
+          setImportStats({
+            rows: data.total,
+            villages: data.villagesCount,
+            sansads: data.sansadsCount
+          });
+        }
+        setIsPermanentlySaved(true);
+        setStatusMessage({
+          type: 'success',
+          text: `✓ ${data.message || `লাইভ সিঙ্ক সফল! ${data.total} জন নাগরিকের ডাটা গুগল শীট থেকে আপডেট হয়েছে।`}`
+        });
+      } else {
+        throw new Error(data.message || 'Failed to refresh live data from Google Sheet');
+      }
+    } catch (err: any) {
+      setStatusMessage({
+        type: 'error',
+        text: `লাইভ সিঙ্ক ত্রুটি: ${err.message || 'Error connecting to Google Sheet'}`
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Save Apps Script Webhook URL for real-time 2-way sync
+  const handleSaveAppsScriptUrl = async () => {
+    setIsLoading(true);
+    setStatusMessage({ type: 'info', text: 'Google Apps Script Webhook লিঙ্ক সেভ করা হচ্ছে...' });
+    try {
+      const res = await fetch('/api/google-sheet/save-apps-script', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ appsScriptUrl })
+      });
+      const data = await res.json();
+      if (res.ok && data.status === 'success') {
+        setStatusMessage({
+          type: 'success',
+          text: '✓ Google Apps Script ২-মুখী Webhook সফলভাবে সেভ করা হয়েছে! এখন পোর্টালে এডিট করলে সরাসরি গুগল শীটে রেকর্ড আপডেট হয়ে যাবে।'
+        });
+      } else {
+        throw new Error(data.message || 'Failed to save Webhook URL');
+      }
+    } catch (err: any) {
+      setStatusMessage({
+        type: 'error',
+        text: `ত্রুটি: ${err.message || 'Failed to save Apps Script URL'}`
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Helper to parse rows into BeneficiaryRow with strict 29-village and 16-Sansad normalization
   const parseRowsToBeneficiaries = (rawData: any[]): BeneficiaryRow[] => {
     if (!Array.isArray(rawData) || rawData.length === 0) return [];
@@ -238,10 +315,10 @@ export const GoogleSheetSyncModal: React.FC<GoogleSheetSyncModalProps> = ({
       if (!Array.isArray(row)) continue;
       const rowStr = row.map(c => String(c || '').toLowerCase().trim()).join(' ');
       if (
-        rowStr.includes('job') || 
-        rowStr.includes('card') || 
-        rowStr.includes('sansad') || 
-        rowStr.includes('village') || 
+        rowStr.includes('job') ||
+        rowStr.includes('card') ||
+        rowStr.includes('sansad') ||
+        rowStr.includes('village') ||
         rowStr.includes('aadhaar') ||
         rowStr.includes('applicant')
       ) {
@@ -570,7 +647,7 @@ export const GoogleSheetSyncModal: React.FC<GoogleSheetSyncModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-xs p-4 overflow-y-auto">
       <div className="relative w-full max-w-2xl bg-white border border-slate-200 rounded-3xl shadow-2xl p-6 sm:p-7 overflow-hidden my-6">
-        
+
         {/* Header */}
         <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
           <div className="flex items-center gap-2.5">
@@ -595,49 +672,61 @@ export const GoogleSheetSyncModal: React.FC<GoogleSheetSyncModalProps> = ({
         </div>
 
         {/* Tab Selection: 100% Direct Google Sheet Link based */}
-        <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-2xl mb-5">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-1.5 bg-slate-100 rounded-2xl mb-5">
           <button
             onClick={() => setActiveMode('sheetLink')}
-            className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-              activeMode === 'sheetLink' 
-                ? 'bg-emerald-600 text-white shadow-xs' 
-                : 'text-slate-700 hover:text-slate-900 bg-white/60'
+            className={`py-2 px-2.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              activeMode === 'sheetLink'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-slate-700 hover:text-slate-900 bg-white/70'
             }`}
           >
             <Link2 className="w-3.5 h-3.5" />
-            <span>Google Sheet Link</span>
+            <span>1. Live Sheet Link</span>
+          </button>
+
+          <button
+            onClick={() => setActiveMode('appsScript')}
+            className={`py-2 px-2.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              activeMode === 'appsScript'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-slate-700 hover:text-slate-900 bg-white/70'
+            }`}
+          >
+            <Zap className="w-3.5 h-3.5 text-amber-300" />
+            <span>2. Two-Way Webhook</span>
           </button>
 
           <button
             onClick={() => setActiveMode('upload')}
-            className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-              activeMode === 'upload' 
-                ? 'bg-emerald-600 text-white shadow-xs' 
-                : 'text-slate-700 hover:text-slate-900 bg-white/60'
+            className={`py-2 px-2.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              activeMode === 'upload'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-slate-700 hover:text-slate-900 bg-white/70'
             }`}
           >
             <Upload className="w-3.5 h-3.5" />
-            <span>Upload Excel / CSV</span>
+            <span>Upload Excel</span>
           </button>
 
           <button
             onClick={() => setActiveMode('paste')}
-            className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-              activeMode === 'paste' 
-                ? 'bg-emerald-600 text-white shadow-xs' 
-                : 'text-slate-700 hover:text-slate-900 bg-white/60'
+            className={`py-2 px-2.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              activeMode === 'paste'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-slate-700 hover:text-slate-900 bg-white/70'
             }`}
           >
             <ClipboardPaste className="w-3.5 h-3.5" />
-            <span>Copy-Paste Table</span>
+            <span>Copy-Paste</span>
           </button>
         </div>
 
         {/* Status Message */}
         {statusMessage && (
           <div className={`p-3.5 rounded-2xl mb-4 text-xs font-semibold flex items-start gap-2.5 ${
-            statusMessage.type === 'success' 
-              ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
+            statusMessage.type === 'success'
+              ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
               : statusMessage.type === 'error'
               ? 'bg-rose-50 text-rose-800 border border-rose-200'
               : 'bg-sky-50 text-sky-800 border border-sky-200'
@@ -652,7 +741,7 @@ export const GoogleSheetSyncModal: React.FC<GoogleSheetSyncModalProps> = ({
         {/* Mode 1: Google Sheet Direct Link (Zero Apps Script) */}
         {activeMode === 'sheetLink' && (
           <div className="space-y-4">
-            
+
             {/* If a permanent link is already configured and user is not editing it */}
             {isPermanentlySaved && savedConfig?.sheetUrl && !isEditingUrl ? (
               <div className="p-4 rounded-2xl bg-emerald-950/20 border border-emerald-500/40 text-xs text-slate-800 space-y-3.5 shadow-xs">
@@ -721,15 +810,42 @@ export const GoogleSheetSyncModal: React.FC<GoogleSheetSyncModalProps> = ({
                   </span>
                 </div>
 
+                {/* Status metrics */}
+                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] pt-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-emerald-800 bg-emerald-100/90 px-2.5 py-1 rounded-lg border border-emerald-200 text-xs flex items-center gap-1.5">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                      </span>
+                      <span>{(savedConfig.totalRecords || currentCount).toLocaleString()} Verified Citizens</span>
+                    </span>
+                    <span className="text-slate-500 font-medium">
+                      {savedConfig.lastSyncTimestamp ? `Last Sync: ${new Date(savedConfig.lastSyncTimestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}` : 'Live Polling Active'}
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                    ● 30-Sec Live Auto-Polling: ACTIVE
+                  </span>
+                </div>
+
                 {/* Action Buttons */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-emerald-200/60">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 pt-2 border-t border-emerald-200/60">
                   <button
-                    onClick={() => handleSavePermanently(true)}
+                    onClick={handleForceLiveRefresh}
                     disabled={isLoading}
-                    className="py-2.5 px-3 rounded-xl btn-3d-sync text-white font-extrabold text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    className="py-2.5 px-3 rounded-xl btn-3d-sync text-white font-extrabold text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-md"
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-                    <span>{isLoading ? 'Syncing...' : '🔄 Re-Sync Live Data'}</span>
+                    <span>{isLoading ? 'Syncing...' : '🔄 Force Live Re-Sync'}</span>
+                  </button>
+
+                  <button
+                    onClick={() => setActiveMode('appsScript')}
+                    className="py-2.5 px-3 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 font-extrabold text-xs flex items-center justify-center gap-1.5 border border-amber-300 transition-colors cursor-pointer shadow-2xs"
+                  >
+                    <Zap className="w-3.5 h-3.5 text-amber-600" />
+                    <span>⚡ 2-Way Webhook</span>
                   </button>
 
                   <button
@@ -852,6 +968,132 @@ export const GoogleSheetSyncModal: React.FC<GoogleSheetSyncModalProps> = ({
                 <li><em>General access</em>-এ <strong>&quot;Anyone with the link&quot;</strong> (Role: <em>Viewer</em>) করে <strong>Copy link</strong> করুন।</li>
                 <li>সেই লিঙ্কটি ওপরের বক্সে পেস্ট করে <strong>&quot;Save Link Permanently &amp; Sync&quot;</strong> ক্লিক করলেই তা স্থায়ীভাবে সংরক্ষিত হয়ে যাবে।</li>
               </ol>
+            </div>
+          </div>
+        )}
+
+        {/* Mode 2: 2-Way Live Webhook (Google Apps Script) */}
+        {activeMode === 'appsScript' && (
+          <div className="space-y-4">
+            <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-200 text-xs text-amber-950 space-y-2">
+              <div className="flex items-center gap-2 font-black text-sm text-amber-900">
+                <Zap className="w-4 h-4 text-amber-600" />
+                <span>২-মুখী স্বয়ংক্রিয় লাইভ সিঙ্ক (Two-Way Live Sync with Google Apps Script)</span>
+              </div>
+              <p className="text-[11px] leading-relaxed text-amber-900">
+                এই সেটআপটি করলে পোর্টালে যেকোনো নাগরিকের আধার, ফোন নম্বর, ই-কেওয়াইসি বা ব্যাংক একাউন্ট আপডেট করা মাত্রই তা সরাসরি আপনার মূল <strong>গুগল স্প্রেডশীটে</strong> লাইভ রাইট (Update) হয়ে যাবে! কোনো ম্যানুয়াল এক্সপোর্ট বা কপি-পেস্ট লাগবে না।
+              </p>
+            </div>
+
+            {/* Webhook URL Input */}
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+              <label className="block text-xs font-bold text-slate-800">
+                Google Apps Script Web App URL:
+              </label>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  type="text"
+                  value={appsScriptUrl}
+                  onChange={(e) => setAppsScriptUrl(e.target.value)}
+                  placeholder="https://script.google.com/macros/s/AKfycb.../exec"
+                  className="flex-1 bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono shadow-inner"
+                />
+                <button
+                  onClick={handleSaveAppsScriptUrl}
+                  disabled={isLoading || !appsScriptUrl.trim()}
+                  className="py-2.5 px-4 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-black text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-md transition-all shrink-0"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Save Webhook</span>
+                </button>
+              </div>
+              {appsScriptUrl.trim() && (
+                <p className="text-[11px] text-emerald-700 font-bold flex items-center gap-1">
+                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Webhook URL সক্রিয় আছে (Two-way updates are ready)</span>
+                </p>
+              )}
+            </div>
+
+            {/* Ready-to-use Apps Script Code Snippet */}
+            <div className="p-4 rounded-2xl bg-slate-900 text-slate-200 space-y-3 shadow-inner">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Code className="w-4 h-4 text-amber-400" />
+                  <span className="text-xs font-bold text-amber-300 font-mono">Google Apps Script Code (Code.gs)</span>
+                </div>
+                <button
+                  onClick={() => {
+                    const scriptCode = `function doPost(e) {
+  try {
+    var data = JSON.parse(e.postData.contents);
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    var rowIndex = data.rowIndex;
+    var jobCard = data.colH;
+    var targetRow = rowIndex;
+    if (!targetRow || targetRow < 2) {
+      var dataRange = sheet.getDataRange().getValues();
+      for (var r = 1; r < dataRange.length; r++) {
+        if (dataRange[r][7] == jobCard) { targetRow = r + 1; break; }
+      }
+    }
+    if (targetRow && targetRow >= 2) {
+      var u = data.updates || data;
+      if (u.colP !== undefined) sheet.getRange(targetRow, 16).setValue(u.colP);
+      if (u.colQ !== undefined) sheet.getRange(targetRow, 17).setValue(u.colQ);
+      if (u.colR !== undefined) sheet.getRange(targetRow, 18).setValue(u.colR);
+      if (u.colS !== undefined) sheet.getRange(targetRow, 19).setValue(u.colS);
+      if (u.colT !== undefined) sheet.getRange(targetRow, 21).setValue(u.colT);
+      if (u.colU !== undefined) sheet.getRange(targetRow, 23).setValue(u.colU);
+      if (u.colV !== undefined) sheet.getRange(targetRow, 24).setValue(u.colV);
+      if (u.colW !== undefined) sheet.getRange(targetRow, 25).setValue(u.colW);
+      if (u.colX !== undefined) sheet.getRange(targetRow, 26).setValue(u.colX);
+      if (u.colY !== undefined) sheet.getRange(targetRow, 27).setValue(u.colY);
+      if (u.colAO !== undefined) sheet.getRange(targetRow, 44).setValue(u.colAO);
+      if (u.colAP !== undefined) sheet.getRange(targetRow, 45).setValue(u.colAP);
+      if (u.colAQ !== undefined) sheet.getRange(targetRow, 46).setValue(u.colAQ);
+      if (u.colAR !== undefined) sheet.getRange(targetRow, 47).setValue(u.colAR);
+      return ContentService.createTextOutput(JSON.stringify({ status: "success", row: targetRow }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Row not found" }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}`;
+                    navigator.clipboard.writeText(scriptCode);
+                    setHasCopiedScript(true);
+                    setTimeout(() => setHasCopiedScript(false), 2500);
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-1.5 cursor-pointer transition-colors shadow-sm"
+                >
+                  {hasCopiedScript ? <Check className="w-3.5 h-3.5 text-slate-950" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{hasCopiedScript ? '✓ Code Copied!' : '📋 Copy Apps Script Code'}</span>
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-300">
+                এই কোডটি গুগল শীটে সেটআপ করার জন্য নিচের ৪টি সহজ ধাপ অনুসরণ করুন:
+              </p>
+              <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800 text-[11px] text-slate-300 space-y-2">
+                <div className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-300 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">1</span>
+                  <span>আপনার Google Sheet খুলুন &gt; মেনুবারে <strong>Extensions</strong> &gt; <strong>Apps Script</strong>-এ ক্লিক করুন।</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-300 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">2</span>
+                  <span>সেখানে থাকা সব কোড মুছে দিয়ে উপরের <strong>&quot;Copy Apps Script Code&quot;</strong> বাটন থেকে কপি করা কোডটি পেস্ট করুন এবং Save আইকনে ক্লিক করুন।</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-300 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">3</span>
+                  <span>ওপরের ডানদিকের নীল <strong>Deploy</strong> বাটন &gt; <strong>New deployment</strong>-এ যান &gt; Type নির্বাচন করুন <strong>Web app</strong>।</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-300 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">4</span>
+                  <span><em>Execute as:</em> <strong>Me</strong> এবং <em>Who has access:</em> <strong>Anyone</strong> দিয়ে <strong>Deploy</strong> করুন এবং প্রাপ্ত <strong>Web app URL</strong> টি কপি করে ওপরের বক্সে সেভ করুন।</span>
+                </div>
+              </div>
             </div>
           </div>
         )}

@@ -629,29 +629,107 @@ async function fetchAndParseGoogleSheet(rawUrl: string): Promise<{
   };
 }
 
-// Background startup sync
-if (initialDiskConfig.sheetUrl && initialDiskConfig.autoSync !== false) {
-  setTimeout(async () => {
-    try {
-      console.log(`[Auto-Sync] Attempting background sync from permanent Google Sheet: ${initialDiskConfig.sheetUrl}`);
-      const res = await fetchAndParseGoogleSheet(initialDiskConfig.sheetUrl);
-      if (res.beneficiaries && res.beneficiaries.length > 0) {
-        beneficiariesCache = res.beneficiaries;
-        lastSyncTimestamp = new Date().toISOString();
-        saveBeneficiariesToDisk(beneficiariesCache);
-        saveSheetConfig({
-          lastSyncTimestamp,
-          totalRecords: beneficiariesCache.length,
-          villagesCount: res.uniqueVillages.length,
-          sansadsCount: res.uniqueSansads.length
-        });
-        console.log(`[Auto-Sync] Successfully loaded ${beneficiariesCache.length} records on startup.`);
-      }
-    } catch (err: any) {
-      console.warn("[Auto-Sync] Startup background sync notice:", err.message);
+// ----------------------------------------------------------------------------
+// Continuous Live Background Auto-Sync Engine (Permanent Live Google Sheet)
+// ----------------------------------------------------------------------------
+let isBackgroundSyncInProgress = false;
+
+async function performLiveGoogleSheetSync(force: boolean = false): Promise<{
+  success: boolean;
+  total: number;
+  villagesCount: number;
+  sansadsCount: number;
+  lastSyncTimestamp: string;
+  message: string;
+  beneficiaries?: BeneficiaryRow[];
+}> {
+  if (isBackgroundSyncInProgress) {
+    return {
+      success: true,
+      total: beneficiariesCache.length,
+      villagesCount: new Set(beneficiariesCache.map(b => b.colV)).size,
+      sansadsCount: new Set(beneficiariesCache.map(b => b.colB)).size,
+      lastSyncTimestamp: lastSyncTimestamp || new Date().toISOString(),
+      message: "Sync currently in progress in background",
+      beneficiaries: beneficiariesCache
+    };
+  }
+
+  const cfg = loadSavedSheetConfig();
+  const urlToSync = activeSyncedSheetUrl || cfg.sheetUrl;
+  if (!urlToSync || urlToSync.trim().length < 8) {
+    return {
+      success: false,
+      total: beneficiariesCache.length,
+      villagesCount: 0,
+      sansadsCount: 0,
+      lastSyncTimestamp: "",
+      message: "No Google Sheet URL configured"
+    };
+  }
+
+  isBackgroundSyncInProgress = true;
+  try {
+    console.log(`[Permanent-Live-Sync] Pulling live data from Google Sheet: ${urlToSync}`);
+    const res = await fetchAndParseGoogleSheet(urlToSync);
+    if (res.beneficiaries && res.beneficiaries.length > 0) {
+      beneficiariesCache = res.beneficiaries;
+      lastSyncTimestamp = new Date().toISOString();
+      activeSyncedSheetUrl = urlToSync;
+      saveBeneficiariesToDisk(beneficiariesCache);
+      saveSheetConfig({
+        sheetUrl: urlToSync,
+        autoSync: cfg.autoSync !== false,
+        lastSyncTimestamp,
+        totalRecords: beneficiariesCache.length,
+        villagesCount: res.uniqueVillages.length,
+        sansadsCount: res.uniqueSansads.length,
+        lastSyncStatus: `Permanent Live: Synced ${beneficiariesCache.length} records at ${new Date().toLocaleTimeString('en-IN')}`
+      });
+      console.log(`[Permanent-Live-Sync] Loaded ${beneficiariesCache.length} records successfully.`);
+      return {
+        success: true,
+        total: beneficiariesCache.length,
+        villagesCount: res.uniqueVillages.length,
+        sansadsCount: res.uniqueSansads.length,
+        lastSyncTimestamp,
+        message: `Successfully synchronized ${beneficiariesCache.length} records across ${res.uniqueVillages.length} villages.`,
+        beneficiaries: beneficiariesCache
+      };
+    } else {
+      throw new Error("Empty dataset returned from Google Sheet.");
     }
-  }, 2500);
+  } catch (err: any) {
+    console.warn("[Permanent-Live-Sync] Notice:", err.message);
+    return {
+      success: false,
+      total: beneficiariesCache.length,
+      villagesCount: new Set(beneficiariesCache.map(b => b.colV)).size,
+      sansadsCount: new Set(beneficiariesCache.map(b => b.colB)).size,
+      lastSyncTimestamp: lastSyncTimestamp || "",
+      message: err.message,
+      beneficiaries: beneficiariesCache
+    };
+  } finally {
+    isBackgroundSyncInProgress = false;
+  }
 }
+
+// Initial background sync on server startup
+setTimeout(() => {
+  const cfg = loadSavedSheetConfig();
+  if (cfg.sheetUrl && cfg.autoSync !== false) {
+    performLiveGoogleSheetSync(true);
+  }
+}, 2000);
+
+// Recurring background polling every 30 seconds to keep Google Sheet permanently live
+setInterval(() => {
+  const cfg = loadSavedSheetConfig();
+  if (cfg.sheetUrl && cfg.autoSync !== false) {
+    performLiveGoogleSheetSync(false);
+  }
+}, 30000);
 
 // ----------------------------------------------------------------------------
 // Google Sheet Live Sync & Permanent Persistence Endpoints
@@ -662,9 +740,14 @@ app.get("/api/google-sheet/status", (req: Request, res: Response) => {
     status: "success",
     syncedSheetUrl: activeSyncedSheetUrl || cfg.sheetUrl || "",
     isSaved: !!(cfg.sheetUrl && cfg.sheetUrl.trim().length > 0),
+    autoSync: cfg.autoSync !== false,
+    appsScriptUrl: cfg.appsScriptUrl || "",
     totalRecords: beneficiariesCache.length,
     villagesCount: new Set(beneficiariesCache.map(b => b.colV)).size,
-    lastSyncTimestamp: lastSyncTimestamp || cfg.lastSyncTimestamp || ""
+    sansadsCount: new Set(beneficiariesCache.map(b => b.colB)).size,
+    lastSyncTimestamp: lastSyncTimestamp || cfg.lastSyncTimestamp || "",
+    isLive: true,
+    pollingIntervalSeconds: 30
   });
 });
 
@@ -676,6 +759,7 @@ app.get("/api/google-sheet/config", (req: Request, res: Response) => {
     config: {
       ...cfg,
       sheetUrl: activeSyncedSheetUrl || cfg.sheetUrl || "",
+      appsScriptUrl: cfg.appsScriptUrl || "",
       lastSyncTimestamp: lastSyncTimestamp || cfg.lastSyncTimestamp || "",
       totalRecords: beneficiariesCache.length,
       villagesCount: new Set(beneficiariesCache.map(b => b.colV)).size,
@@ -684,10 +768,58 @@ app.get("/api/google-sheet/config", (req: Request, res: Response) => {
   });
 });
 
+// Force Live Refresh Endpoint (Triggered by user or automated interval)
+app.post("/api/google-sheet/refresh", async (req: Request, res: Response) => {
+  try {
+    const result = await performLiveGoogleSheetSync(true);
+    if (result.success) {
+      return res.json({
+        status: "success",
+        message: `গুগল শীট থেকে সফলভাবে লাইভ ডাটা রিফ্রেশ হয়েছে (${result.total} টি রেকর্ড)।`,
+        total: result.total,
+        villagesCount: result.villagesCount,
+        sansadsCount: result.sansadsCount,
+        lastSyncTimestamp: result.lastSyncTimestamp,
+        beneficiaries: beneficiariesCache
+      });
+    } else {
+      return res.status(500).json({
+        status: "error",
+        message: `লাইভ সিঙ্ক ব্যর্থ হয়েছে: ${result.message}`,
+        total: beneficiariesCache.length,
+        beneficiaries: beneficiariesCache
+      });
+    }
+  } catch (err: any) {
+    res.status(500).json({
+      status: "error",
+      message: err.message || "Failed to refresh Google Sheet data"
+    });
+  }
+});
+
+// Save Apps Script Webhook URL (for 2-way live push)
+app.post("/api/google-sheet/save-apps-script", (req: Request, res: Response) => {
+  try {
+    const { appsScriptUrl } = req.body;
+    const trimmed = String(appsScriptUrl || "").trim();
+    const updated = saveSheetConfig({
+      appsScriptUrl: trimmed
+    });
+    return res.json({
+      status: "success",
+      message: trimmed ? "Google Apps Script 2-Way Webhook saved successfully!" : "Apps Script Webhook URL cleared.",
+      config: updated
+    });
+  } catch (err: any) {
+    res.status(500).json({ status: "error", message: err.message });
+  }
+});
+
 // Permanent Save Endpoint
 app.post("/api/google-sheet/save-link", async (req: Request, res: Response) => {
   try {
-    const { sheetUrl, autoSync = true, syncNow = true } = req.body;
+    const { sheetUrl, appsScriptUrl, autoSync = true, syncNow = true } = req.body;
     if (!sheetUrl || typeof sheetUrl !== "string" || sheetUrl.trim().length < 8) {
       return res.status(400).json({
         status: "error",
@@ -696,10 +828,12 @@ app.post("/api/google-sheet/save-link", async (req: Request, res: Response) => {
     }
 
     const trimmedUrl = sheetUrl.trim();
+    const trimmedScriptUrl = appsScriptUrl ? String(appsScriptUrl).trim() : undefined;
 
     // Persist configuration to disk immediately
     saveSheetConfig({
       sheetUrl: trimmedUrl,
+      ...(trimmedScriptUrl !== undefined ? { appsScriptUrl: trimmedScriptUrl } : {}),
       autoSync: autoSync !== false
     });
     activeSyncedSheetUrl = trimmedUrl;
@@ -712,6 +846,7 @@ app.post("/api/google-sheet/save-link", async (req: Request, res: Response) => {
       saveBeneficiariesToDisk(beneficiariesCache);
       const updatedConfig = saveSheetConfig({
         sheetUrl: trimmedUrl,
+        ...(trimmedScriptUrl !== undefined ? { appsScriptUrl: trimmedScriptUrl } : {}),
         autoSync: autoSync !== false,
         lastSyncTimestamp,
         totalRecords: beneficiariesCache.length,

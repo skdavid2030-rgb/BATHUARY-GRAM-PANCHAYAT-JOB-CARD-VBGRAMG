@@ -103,35 +103,84 @@ export default function App() {
     }
   };
 
-  // Fetch initial data from Express backend
-  const fetchAllData = async () => {
+  // Fetch initial data from Express backend with Live Google Sheet check
+  const fetchAllData = async (forceLiveSync: boolean = false) => {
     setIsSyncing(true);
     try {
-      // 1. Fetch Beneficiaries (always retrieve complete dataset)
-      const bRes = await fetch('/api/beneficiaries');
-      if (bRes.ok) {
-        const bData = await bRes.json();
-        if (bData.beneficiaries && Array.isArray(bData.beneficiaries)) {
-          // Normalize both villages (29 canonical) and sansads (16 canonical)
-          const normalized = bData.beneficiaries.map((b: BeneficiaryRow) => {
-            const normVillage = normalizeVillageName(b.colV, b.colB);
-            return {
-              ...b,
-              colV: normVillage,
-              colB: normalizeSansadName(b.colB, normVillage) || 'SANSAD-I'
-            };
-          });
-          setBeneficiaries(normalized);
-
-          if (bData.sansadList && Array.isArray(bData.sansadList) && bData.sansadList.length > 0) {
-            setSansadList(bData.sansadList);
+      // 1. Check Permanent Google Sheet Configuration
+      let isLiveConfigured = false;
+      try {
+        const cfgRes = await fetch('/api/google-sheet/config');
+        if (cfgRes.ok) {
+          const cfgData = await cfgRes.json();
+          if (cfgData.isSaved && cfgData.config?.sheetUrl) {
+            setIsSheetPermanentlySaved(true);
+            safeStorage.setItem('bathuary_google_sheet_url', cfgData.config.sheetUrl);
+            isLiveConfigured = true;
           } else {
-            updateSansadListFromRecords(normalized);
+            setIsSheetPermanentlySaved(false);
+          }
+        }
+      } catch {
+        // ignore
+      }
+
+      // If user clicked refresh or forceLiveSync is requested and Sheet is configured, sync directly
+      let beneficiariesLoaded = false;
+      if (forceLiveSync && isLiveConfigured) {
+        try {
+          const syncRes = await fetch('/api/google-sheet/refresh', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          });
+          if (syncRes.ok) {
+            const syncData = await syncRes.json();
+            if (syncData.status === 'success' && Array.isArray(syncData.beneficiaries) && syncData.beneficiaries.length > 0) {
+              const normalized = syncData.beneficiaries.map((b: BeneficiaryRow) => {
+                const normVillage = normalizeVillageName(b.colV, b.colB);
+                return {
+                  ...b,
+                  colV: normVillage,
+                  colB: normalizeSansadName(b.colB, normVillage) || 'SANSAD-I'
+                };
+              });
+              setBeneficiaries(normalized);
+              updateSansadListFromRecords(normalized);
+              beneficiariesLoaded = true;
+            }
+          }
+        } catch (e) {
+          console.warn("Direct live refresh fallback:", e);
+        }
+      }
+
+      // 2. Fetch Beneficiaries from cache if not already loaded from live refresh
+      if (!beneficiariesLoaded) {
+        const bRes = await fetch('/api/beneficiaries');
+        if (bRes.ok) {
+          const bData = await bRes.json();
+          if (bData.beneficiaries && Array.isArray(bData.beneficiaries)) {
+            // Normalize both villages (29 canonical) and sansads (16 canonical)
+            const normalized = bData.beneficiaries.map((b: BeneficiaryRow) => {
+              const normVillage = normalizeVillageName(b.colV, b.colB);
+              return {
+                ...b,
+                colV: normVillage,
+                colB: normalizeSansadName(b.colB, normVillage) || 'SANSAD-I'
+              };
+            });
+            setBeneficiaries(normalized);
+
+            if (bData.sansadList && Array.isArray(bData.sansadList) && bData.sansadList.length > 0) {
+              setSansadList(bData.sansadList);
+            } else {
+              updateSansadListFromRecords(normalized);
+            }
           }
         }
       }
 
-      // 2. Fetch Users
+      // 3. Fetch Users
       const uRes = await fetch('/api/users');
       if (uRes.ok) {
         const uData = await uRes.json();
@@ -140,7 +189,7 @@ export default function App() {
         }
       }
 
-      // 3. Fetch Audit Logs
+      // 4. Fetch Audit Logs
       const aRes = await fetch('/api/audit-logs');
       if (aRes.ok) {
         const aData = await aRes.json();
@@ -149,29 +198,13 @@ export default function App() {
         }
       }
 
-      // 4. Fetch Bank Master
+      // 5. Fetch Bank Master
       const bmRes = await fetch('/api/bank-master');
       if (bmRes.ok) {
         const bmData = await bmRes.json();
         if (bmData.banks && Array.isArray(bmData.banks)) {
           setBankMaster(bmData.banks);
         }
-      }
-
-      // 5. Fetch Permanent Google Sheet Configuration
-      try {
-        const cfgRes = await fetch('/api/google-sheet/config');
-        if (cfgRes.ok) {
-          const cfgData = await cfgRes.json();
-          if (cfgData.isSaved && cfgData.config?.sheetUrl) {
-            setIsSheetPermanentlySaved(true);
-            safeStorage.setItem('bathuary_google_sheet_url', cfgData.config.sheetUrl);
-          } else {
-            setIsSheetPermanentlySaved(false);
-          }
-        }
-      } catch {
-        // ignore
       }
     } catch (err) {
       console.warn("Backend API not reachable yet:", err);
@@ -180,37 +213,39 @@ export default function App() {
     }
   };
 
-  // Auto-link Google Sheet on startup if URL is saved
+  // Continuous background 30-second live polling for permanent Google Sheet updates
   useEffect(() => {
-    const autoSync = async () => {
-      const savedUrl = safeStorage.getItem('bathuary_google_sheet_url');
-      const isAutoEnabled = safeStorage.getItem('bathuary_auto_sync_enabled') !== 'false';
-      if (savedUrl && isAutoEnabled) {
-        try {
-          const res = await fetch('/api/sync-google-sheet', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sheetUrl: savedUrl })
-          });
-          const data = await res.json();
-          if (res.ok && data.status === 'success' && Array.isArray(data.beneficiaries)) {
-            const normalized = data.beneficiaries.map((b: BeneficiaryRow) => {
-              const v = normalizeVillageName(b.colV, b.colB);
-              return {
-                ...b,
-                colV: v,
-                colB: normalizeSansadName(b.colB, v) || 'SANSAD-I'
-              };
-            });
-            setBeneficiaries(normalized);
-            updateSansadListFromRecords(normalized);
+    const livePollingInterval = setInterval(async () => {
+      try {
+        const statusRes = await fetch('/api/google-sheet/status');
+        if (statusRes.ok) {
+          const statusData = await statusRes.json();
+          if (statusData.isSaved) {
+            setIsSheetPermanentlySaved(true);
+            // Fetch updated records from backend cache (updated automatically by server every 30s)
+            const bRes = await fetch('/api/beneficiaries');
+            if (bRes.ok) {
+              const bData = await bRes.json();
+              if (bData.beneficiaries && Array.isArray(bData.beneficiaries) && bData.beneficiaries.length > 0) {
+                const normalized = bData.beneficiaries.map((b: BeneficiaryRow) => {
+                  const normVillage = normalizeVillageName(b.colV, b.colB);
+                  return {
+                    ...b,
+                    colV: normVillage,
+                    colB: normalizeSansadName(b.colB, normVillage) || 'SANSAD-I'
+                  };
+                });
+                setBeneficiaries(normalized);
+              }
+            }
           }
-        } catch (e) {
-          console.warn("Auto-sync background check failed:", e);
         }
+      } catch {
+        // quiet error
       }
-    };
-    autoSync();
+    }, 30000);
+
+    return () => clearInterval(livePollingInterval);
   }, []);
 
   useEffect(() => {
@@ -448,7 +483,7 @@ export default function App() {
           currentTab={currentTab}
           onOpenSidebar={() => setIsSidebarOpen(true)}
           isSyncing={isSyncing}
-          onRefreshData={fetchAllData}
+          onRefreshData={() => fetchAllData(true)}
           onOpenSyncModal={() => setIsSyncModalOpen(true)}
           syncedSheetInfo={{
             totalRecords: beneficiaries.length,
