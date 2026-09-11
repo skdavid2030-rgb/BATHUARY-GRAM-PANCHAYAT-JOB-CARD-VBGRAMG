@@ -127,10 +127,13 @@ export default function App() {
       // 1. Process Google Sheet configuration
       if (cfgRes && cfgRes.ok) {
         try {
-          const cfgData = await cfgRes.json();
-          if (cfgData.config?.sheetUrl) {
-            setIsSheetPermanentlySaved(true);
-            safeStorage.setItem('bathuary_google_sheet_url', cfgData.config.sheetUrl);
+          const text = await cfgRes.text();
+          if (text && text.trim().length > 0) {
+            const cfgData = JSON.parse(text);
+            if (cfgData.config?.sheetUrl) {
+              setIsSheetPermanentlySaved(true);
+              safeStorage.setItem('bathuary_google_sheet_url', cfgData.config.sheetUrl);
+            }
           }
         } catch {
           // ignore
@@ -140,8 +143,12 @@ export default function App() {
       // 2. Process Beneficiaries
       if (bRes && bRes.ok) {
         try {
-          const bData = await bRes.json();
-          const list = bData.beneficiaries;
+          const rawText = await bRes.text();
+          let bData: any = null;
+          if (rawText && rawText.trim().length > 0) {
+            bData = JSON.parse(rawText);
+          }
+          const list = bData?.beneficiaries;
           if (Array.isArray(list) && list.length > 0) {
             const normalized = list.map((b: BeneficiaryRow) => {
               const normVillage = normalizeVillageName(b.colV, b.colB);
@@ -202,27 +209,39 @@ export default function App() {
 
   // Continuous background 30-second live polling for permanent Google Sheet updates
   useEffect(() => {
+    let lastKnownSyncTime = '';
     const livePollingInterval = setInterval(async () => {
       try {
         const statusRes = await fetch('/api/google-sheet/status');
         if (statusRes.ok) {
-          const statusData = await statusRes.json();
-          if (statusData.isSaved) {
+          const text = await statusRes.text();
+          let statusData: any = null;
+          try {
+            statusData = JSON.parse(text);
+          } catch {}
+          if (statusData && statusData.isSaved) {
             setIsSheetPermanentlySaved(true);
-            // Fetch updated records from backend cache (updated automatically by server every 30s)
-            const bRes = await fetch('/api/beneficiaries');
-            if (bRes.ok) {
-              const bData = await bRes.json();
-              if (bData.beneficiaries && Array.isArray(bData.beneficiaries) && bData.beneficiaries.length > 0) {
-                const normalized = bData.beneficiaries.map((b: BeneficiaryRow) => {
-                  const normVillage = normalizeVillageName(b.colV, b.colB);
-                  return {
-                    ...b,
-                    colV: normVillage,
-                    colB: normalizeSansadName(b.colB, normVillage) || 'SANSAD-I'
-                  };
-                });
-                setBeneficiaries(normalized);
+            // Only fetch 4MB full dataset if server has performed a new sync timestamp
+            if (statusData.lastSyncTimestamp && statusData.lastSyncTimestamp !== lastKnownSyncTime) {
+              lastKnownSyncTime = statusData.lastSyncTimestamp;
+              const bRes = await fetch('/api/beneficiaries');
+              if (bRes.ok) {
+                const bText = await bRes.text();
+                let bData: any = null;
+                try {
+                  bData = JSON.parse(bText);
+                } catch {}
+                if (bData?.beneficiaries && Array.isArray(bData.beneficiaries) && bData.beneficiaries.length > 0) {
+                  const normalized = bData.beneficiaries.map((b: BeneficiaryRow) => {
+                    const normVillage = normalizeVillageName(b.colV, b.colB);
+                    return {
+                      ...b,
+                      colV: normVillage,
+                      colB: normalizeSansadName(b.colB, normVillage) || 'SANSAD-I'
+                    };
+                  });
+                  setBeneficiaries(normalized);
+                }
               }
             }
           }
