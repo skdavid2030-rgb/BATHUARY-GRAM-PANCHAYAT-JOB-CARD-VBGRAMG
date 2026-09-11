@@ -1,0 +1,8 @@
+{
+  "name": "Bathuary Gram Panchayat Job Card Portal",
+  "description": "Dynamic 3D Job Card Management, e-KYC Verification, and Analytics Dashboard for Bathuary Gram Panchayat, Govt. of West Bengal.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

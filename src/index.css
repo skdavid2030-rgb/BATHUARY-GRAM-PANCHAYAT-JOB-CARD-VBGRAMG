@@ -1,0 +1,371 @@
+@import "tailwindcss";
+
+@layer utilities {
+  .perspective-1000 {
+    perspective: 1000px;
+  }
+  .perspective-2000 {
+    perspective: 2000px;
+  }
+  .transform-style-3d {
+    transform-style: preserve-3d;
+  }
+  .backface-hidden {
+    backface-visibility: hidden;
+  }
+  .translate-z-10 {
+    transform: translateZ(10px);
+  }
+  .translate-z-20 {
+    transform: translateZ(20px);
+  }
+  .translate-z-30 {
+    transform: translateZ(30px);
+  }
+  .translate-z-50 {
+    transform: translateZ(50px);
+  }
+  .rotate-x-6 {
+    transform: rotateX(6deg);
+  }
+  .rotate-y-6 {
+    transform: rotateY(6deg);
+  }
+  .glow-blue {
+    box-shadow: 0 0 35px -5px rgba(59, 130, 246, 0.45);
+  }
+  .glow-emerald {
+    box-shadow: 0 0 35px -5px rgba(16, 185, 129, 0.45);
+  }
+  .glow-amber {
+    box-shadow: 0 0 35px -5px rgba(245, 158, 11, 0.45);
+  }
+  .glow-indigo {
+    box-shadow: 0 0 35px -5px rgba(99, 102, 241, 0.45);
+  }
+  .glow-purple {
+    box-shadow: 0 0 35px -5px rgba(168, 85, 247, 0.45);
+  }
+  .glass-card {
+    background: rgba(15, 23, 42, 0.75);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+  }
+  .glass-card-light {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+  }
+
+  /* 3D Tactile Dynamic Action Buttons */
+  .btn-3d-save {
+    position: relative;
+    background: linear-gradient(180deg, #10b981 0%, #059669 60%, #047857 100%);
+    box-shadow: 0 4px 0 #065f46, 0 6px 16px rgba(16, 185, 129, 0.4);
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: translateY(0);
+    overflow: hidden;
+  }
+  .btn-3d-save:hover {
+    background: linear-gradient(180deg, #34d399 0%, #059669 60%, #047857 100%);
+    box-shadow: 0 6px 0 #065f46, 0 10px 22px rgba(16, 185, 129, 0.55);
+    transform: translateY(-2px);
+  }
+  .btn-3d-save:active {
+    box-shadow: 0 1px 0 #065f46, 0 2px 6px rgba(16, 185, 129, 0.25);
+    transform: translateY(3px);
+  }
+
+  .btn-3d-slip {
+    position: relative;
+    background: linear-gradient(180deg, #6366f1 0%, #4f46e5 60%, #4338ca 100%);
+    box-shadow: 0 4px 0 #3730a3, 0 6px 16px rgba(79, 70, 229, 0.45);
+    color: #ffffff;
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: translateY(0);
+    overflow: hidden;
+  }
+  .btn-3d-slip:hover {
+    background: linear-gradient(180deg, #818cf8 0%, #4f46e5 60%, #3730a3 100%);
+    box-shadow: 0 6px 0 #312e81, 0 10px 22px rgba(79, 70, 229, 0.6);
+    transform: translateY(-2px);
+  }
+  .btn-3d-slip:active {
+    box-shadow: 0 1px 0 #312e81, 0 2px 6px rgba(79, 70, 229, 0.25);
+    transform: translateY(3px);
+  }
+
+  .btn-3d-jobcard {
+    position: relative;
+    background: linear-gradient(180deg, #0ea5e9 0%, #0284c7 60%, #0369a1 100%);
+    box-shadow: 0 4px 0 #075985, 0 6px 18px rgba(2, 132, 199, 0.45);
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: translateY(0);
+    overflow: hidden;
+  }
+  .btn-3d-jobcard:hover {
+    background: linear-gradient(180deg, #38bdf8 0%, #0284c7 60%, #0369a1 100%);
+    box-shadow: 0 6px 0 #075985, 0 10px 24px rgba(2, 132, 199, 0.6);
+    transform: translateY(-2px);
+  }
+  .btn-3d-jobcard:active {
+    box-shadow: 0 1px 0 #075985, 0 2px 6px rgba(2, 132, 199, 0.25);
+    transform: translateY(3px);
+  }
+
+  .btn-3d-sync {
+    position: relative;
+    background: linear-gradient(180deg, #6366f1 0%, #4f46e5 60%, #4338ca 100%);
+    box-shadow: 0 4px 0 #3730a3, 0 6px 16px rgba(79, 70, 229, 0.4);
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: translateY(0);
+    overflow: hidden;
+  }
+  .btn-3d-sync:hover {
+    background: linear-gradient(180deg, #818cf8 0%, #4f46e5 60%, #4338ca 100%);
+    box-shadow: 0 6px 0 #3730a3, 0 10px 22px rgba(79, 70, 229, 0.55);
+    transform: translateY(-2px);
+  }
+  .btn-3d-sync:active {
+    box-shadow: 0 1px 0 #3730a3, 0 2px 6px rgba(79, 70, 229, 0.25);
+    transform: translateY(3px);
+  }
+
+  /* Vibrant Accent Gradients */
+  .bg-gradient-vibrant {
+    background: linear-gradient(135deg, #059669 0%, #0284c7 50%, #6366f1 100%);
+  }
+
+  .bg-gradient-hero {
+    background: radial-gradient(circle at 10% 20%, rgba(16, 185, 129, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(99, 102, 241, 0.15) 0%, transparent 40%),
+                linear-gradient(135deg, #070d1e 0%, #0f172a 50%, #1e1b4b 100%);
+  }
+
+  /* Smooth dynamic hover lift */
+  .hover-lift {
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
+  }
+  .hover-lift:hover {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes pulseRing {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+@keyframes shimmerGlow {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+.animate-gradient-shift {
+  background-size: 200% 200%;
+  animation: gradientShift 6s ease infinite;
+}
+
+.animate-pulse-ring {
+  animation: pulseRing 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.shimmer-effect {
+  position: relative;
+  overflow: hidden;
+}
+.shimmer-effect::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+  transform: skewX(-20deg);
+  animation: shimmerGlow 3.5s infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-8px) rotate(1deg); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.6; filter: blur(20px); }
+  50% { opacity: 0.9; filter: blur(28px); }
+}
+
+.animate-float {
+  animation: float 5s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 4s ease-in-out infinite;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #10b981;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #059669;
+}
+
+/* Print Styles */
+@media print {
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  /* CRITICAL: Reset desktop sidebar padding on root wrappers so print is NEVER shifted or cut off */
+  .lg\:pl-72,
+  #root > div > div {
+    padding-left: 0 !important;
+    margin-left: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  main {
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+  }
+
+  .no-print,
+  .print\:hidden {
+    display: none !important;
+  }
+  .print-only,
+  .print\:block {
+    display: block !important;
+  }
+
+  /* When print modals are active, hide all main application siblings */
+  body.print-slip-modal-active > #root > div > *:not(.print-slip-modal-root),
+  body.print-jobcard-modal-active > #root > div > *:not(.print-jobcard-modal-root) {
+    display: none !important;
+  }
+
+  /* Ensure modal overlays don't create grey backgrounds, shadows or extra pages */
+  .print-modal-root {
+    position: static !important;
+    inset: auto !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    display: block !important;
+  }
+
+  .print-modal-card {
+    position: static !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+    background: transparent !important;
+  }
+
+  #printableA5SlipArea {
+    display: block !important;
+    width: 100% !important;
+    max-width: 138mm !important;
+    margin: 0 auto !important;
+    border: 1.5px solid #0f172a !important;
+    border-radius: 4px !important;
+    box-shadow: none !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  #printableSlipArea {
+    display: block !important;
+    width: 100% !important;
+    max-width: 138mm !important;
+    margin: 0 auto !important;
+    border: 1.5px solid #0f172a !important;
+    border-radius: 4px !important;
+    box-shadow: none !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Dedicated A4 Village & Sansad Analytical Report Print Setup */
+  #printableVillageReport {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+
+  #printableVillageReport table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    table-layout: fixed !important;
+  }
+
+  #printableVillageReport thead {
+    display: table-header-group !important;
+  }
+
+  #printableVillageReport tbody {
+    display: table-row-group !important;
+  }
+
+  #printableVillageReport tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  #printableVillageReport th,
+  #printableVillageReport td {
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+  }
+
+  .report-sign-block {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    margin-top: 20px !important;
+    display: flex !important;
+  }
+
+  @page {
+    margin: 8mm 8mm 10mm 8mm;
+    size: auto;
+  }
+}
