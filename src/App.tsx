@@ -58,6 +58,8 @@ export default function App() {
   const handleLoginSuccess = (user: AppUser) => {
     setCurrentUser(user);
     setIsAuthenticated(true);
+    // AI Smart Auto-Sync: Automatically trigger live synchronization from Google Sheet upon login
+    fetchAllData(true);
   };
 
   const handleLogout = () => {
@@ -207,7 +209,7 @@ export default function App() {
     }
   };
 
-  // Continuous background 30-second live polling for permanent Google Sheet updates
+  // Continuous background 15-second live polling for permanent Google Sheet updates
   useEffect(() => {
     let lastKnownSyncTime = '';
     const livePollingInterval = setInterval(async () => {
@@ -221,7 +223,7 @@ export default function App() {
           } catch {}
           if (statusData && statusData.isSaved) {
             setIsSheetPermanentlySaved(true);
-            // Only fetch 4MB full dataset if server has performed a new sync timestamp
+            // Only fetch full dataset if server has performed a new sync timestamp
             if (statusData.lastSyncTimestamp && statusData.lastSyncTimestamp !== lastKnownSyncTime) {
               lastKnownSyncTime = statusData.lastSyncTimestamp;
               const bRes = await fetch('/api/beneficiaries');
@@ -249,13 +251,41 @@ export default function App() {
       } catch {
         // quiet error
       }
-    }, 30000);
+    }, 15000);
 
     return () => clearInterval(livePollingInterval);
   }, []);
 
+  // AI Smart Auto-Sync Engine on App Startup & Website Re-open
   useEffect(() => {
-    fetchAllData();
+    // 1. Instant cache load for zero lag
+    fetchAllData(false);
+
+    // 2. Automatic background live re-sync from Google Sheet without manual intervention
+    const liveSyncTimer = setTimeout(() => {
+      fetchAllData(true);
+    }, 600);
+
+    return () => clearTimeout(liveSyncTimer);
+  }, []);
+
+  // AI Smart Auto-Sync on Tab Focus & Window Visibility
+  // (Automatically synchronizes when returning from another tab or after computer wake-up)
+  useEffect(() => {
+    let lastFocusSync = Date.now();
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible' && Date.now() - lastFocusSync > 20000) {
+        lastFocusSync = Date.now();
+        fetchAllData(false);
+      }
+    };
+
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    return () => {
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+    };
   }, []);
 
   // Filter Beneficiaries by Sansad (handles exact string as well as Roman/number equivalence)
@@ -503,7 +533,7 @@ export default function App() {
         {/* Main Content Area */}
         <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 print:max-w-none print:p-0 print:m-0 print:w-full">
           
-          {/* Permanent Google Sheet Connectivity Notice (Shown only during initial load if records array is loading) */}
+          {/* AI Smart Auto-Sync Engine Notice (Displayed during initial data load) */}
           {beneficiaries.length === 0 && (
             <div className="mb-6 p-5 sm:p-6 bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 rounded-3xl text-white shadow-xl border border-emerald-500/30 no-print">
               <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -513,23 +543,21 @@ export default function App() {
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                     </span>
-                    <span>Google Sheet Permanently Linked • Bathuary GP</span>
+                    <span>🤖 AI Smart Auto-Sync Engine • Bathuary GP</span>
                   </div>
                   <h3 className="text-xl font-black text-white flex items-center gap-2">
-                    {isSyncing ? 'গুগল স্প্রেডশীট থেকে লাইভ ডাটা লোড হচ্ছে...' : 'লাইভ গুগল স্প্রেডশীট সংযোগ সক্রিয়'}
+                    {isSyncing ? 'গুগল স্প্রেডশীট থেকে লাইভ তথ্য স্বয়ংক্রিয়ভাবে লোড হচ্ছে...' : 'লাইভ গুগল স্প্রেডশীট স্বয়ংক্রিয়ভাবে সংযুক্ত'}
                   </h3>
                   <p className="text-xs text-slate-300 leading-relaxed">
-                    বাথুয়ারী গ্রাম পঞ্চায়েতের অফিসিয়াল গুগল স্প্রেডশীট স্থায়ীভাবে সংযুক্ত রয়েছে (Permanent Link Active)। পুনরায় লিঙ্ক দেওয়ার প্রয়োজন নেই।
+                    বাথুয়ারী গ্রাম পঞ্চায়েতের অফিসিয়াল গুগল শীট থেকে ডাটা সম্পূর্ণ স্বয়ংক্রিয়ভাবে সিঙ্ক হচ্ছে। কোনো ম্যানুয়াল বোতাম চাপার প্রয়োজন নেই।
                   </p>
                 </div>
-                <button
-                  onClick={() => fetchAllData(true)}
-                  disabled={isSyncing}
-                  className="px-5 py-3 rounded-2xl btn-3d-sync text-white font-black text-xs sm:text-sm flex items-center gap-2 shadow-lg transition-all cursor-pointer shrink-0 disabled:opacity-50"
-                >
-                  <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-                  <span>{isSyncing ? 'Loading Live Data...' : '🔄 Re-Sync Now'}</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-emerald-400 font-mono bg-emerald-950/80 px-3 py-2 rounded-xl border border-emerald-500/40 flex items-center gap-2">
+                    <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-amber-300' : 'text-emerald-400'}`} />
+                    <span>{isSyncing ? 'AI Auto-Syncing...' : 'Auto-Sync Active'}</span>
+                  </span>
+                </div>
               </div>
             </div>
           )}

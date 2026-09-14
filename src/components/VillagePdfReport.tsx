@@ -146,29 +146,20 @@ export const VillagePdfReport: React.FC<VillagePdfReportProps> = ({
     setIsPreparingPrint(true);
     setIsPrinting(true);
 
-    // Give browser 50ms to mount print DOM before triggering window.print()
+    // Give browser sufficient time to mount and format print DOM before triggering window.print()
     setTimeout(() => {
       const originalTitle = document.title;
-      const orientationStyle = document.createElement('style');
-      orientationStyle.id = 'print-orientation-override';
-      orientationStyle.innerHTML = `@page { size: A4 ${printOrientation.toLowerCase()}; margin: 8mm 8mm 10mm 8mm; }`;
-      document.head.appendChild(orientationStyle);
-
       try {
         document.title = `Bathuary_GP_Report_${selectedSansad || selectedVillage || 'All'}_${selectedCategory}`;
         window.print();
       } catch (err) {
         console.warn('Print blocked or unavailable:', err);
       } finally {
-        setTimeout(() => {
-          document.title = originalTitle;
-          const el = document.getElementById('print-orientation-override');
-          if (el) el.remove();
-          setIsPrinting(false);
-          setIsPreparingPrint(false);
-        }, 800);
+        document.title = originalTitle;
+        // isPrinting is safely reset when user closes print preview via the afterprint listener
+        setIsPreparingPrint(false);
       }
-    }, 60);
+    }, 120);
   };
 
   const handleExportExcel = () => {
@@ -468,8 +459,16 @@ export const VillagePdfReport: React.FC<VillagePdfReportProps> = ({
       {/* Complete Printable Report Container (A4 Optimized) */}
       <div id="printableVillageReport" className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm flex flex-col print:border-none print:shadow-none print:rounded-none">
         
+        {/* Dynamic @page sizing matching user's selected orientation with 6mm margins */}
+        <style>{`
+          @page {
+            size: A4 ${printOrientation.toLowerCase()};
+            margin: 8mm 6mm 8mm 6mm;
+          }
+        `}</style>
+
         {/* OFFICIAL A4 PRINT HEADER (Visible only in Print) - 100% Center Aligned as Requested */}
-        <div className="hidden print:block mb-4 pb-3 border-b-2 border-slate-900">
+        <div className="hidden print:block mb-3 pb-2 border-b-2 border-slate-900">
           <div className="flex items-center justify-between">
             {/* Left Insignia: State Emblem */}
             <div className="w-16 flex justify-start">
@@ -501,13 +500,13 @@ export const VillagePdfReport: React.FC<VillagePdfReportProps> = ({
             </div>
           </div>
 
-          {/* Filter Metadata Sub-Banner */}
-          <div className="mt-2 pt-1.5 border-t border-slate-300 flex items-center justify-between text-[9px] font-bold text-slate-800 uppercase">
-            <span>Sansad: {selectedSansad || 'ALL 16 SANSADS'}</span>
-            <span>Village: {selectedVillage || 'ALL 29 VILLAGES'}</span>
-            <span>Status: {selectedCategory}</span>
-            <span>Date: {todayStr}</span>
-            <span>Total Records: {rowsToPrint.length}</span>
+          {/* Filter Metadata Sub-Banner - 100% fits within page width */}
+          <div className="mt-2 pt-1.5 border-t border-slate-900 grid grid-cols-5 gap-1 text-[8pt] font-extrabold text-slate-900 uppercase">
+            <span className="text-left truncate">Sansad: {selectedSansad || 'ALL SANSADS'}</span>
+            <span className="text-center truncate">Village: {selectedVillage || 'ALL VILLAGES'}</span>
+            <span className="text-center truncate">Status: {selectedCategory}</span>
+            <span className="text-center">Date: {todayStr}</span>
+            <span className="text-right">Total: {rowsToPrint.length}</span>
           </div>
         </div>
 
@@ -573,28 +572,28 @@ export const VillagePdfReport: React.FC<VillagePdfReportProps> = ({
 
         {/* Master Table - Perfectly Sized for Screen & Print */}
         <div className="overflow-x-auto print:overflow-visible">
-          <table className="w-full text-left border-collapse print:text-black">
+          <table className="w-full text-left border-collapse print:text-black print:table-fixed">
             <thead className="bg-slate-900 text-white sticky top-0 z-10 font-sans print:bg-slate-100 print:text-black print:table-header-group">
               {selectedCategory === 'UNIQUE_CARDS' ? (
                 <tr className="print:border-b-2 print:border-slate-900">
-                  <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 w-12 text-center print:border-slate-800 print:text-[8pt] print:p-1.5">Sl No</th>
-                  <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 w-28 print:border-slate-800 print:text-[8pt] print:p-1.5">Sansad Name & No</th>
-                  <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 w-44 print:border-slate-800 print:text-[8pt] print:p-1.5">Job Card Number</th>
-                  <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 print:border-slate-800 print:text-[8pt] print:p-1.5">Head Of House Hold</th>
-                  <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 print:border-slate-800 print:text-[8pt] print:p-1.5">Father&apos;s/Husband&apos;s Name of HH</th>
-                  <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 w-36 print:border-slate-800 print:text-[8pt] print:p-1.5">Village Name</th>
+                  <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 w-12 text-center print:border-slate-800 print:text-[7pt] print:p-1 print:w-[4%]">Sl No</th>
+                  <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 w-28 print:border-slate-800 print:text-[7pt] print:p-1 print:w-[13%]">Sansad Name & No</th>
+                  <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 w-44 print:border-slate-800 print:text-[7pt] print:p-1 print:w-[24%]">Job Card Number</th>
+                  <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 print:border-slate-800 print:text-[7pt] print:p-1 print:w-[22%]">Head Of House Hold</th>
+                  <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 print:border-slate-800 print:text-[7pt] print:p-1 print:w-[22%]">Father&apos;s/Husband&apos;s Name of HH</th>
+                  <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 w-36 print:border-slate-800 print:text-[7pt] print:p-1 print:w-[15%]">Village Name</th>
                   <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider text-center no-print print:hidden action-column-header w-32" data-no-print="true">Action</th>
                 </tr>
               ) : (
                 <tr className="print:border-b-2 print:border-slate-900">
-                  <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 w-10 text-center print:border-slate-800 print:text-[8pt] print:p-1.5">Sl</th>
-                  <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 w-24 print:border-slate-800 print:text-[8pt] print:p-1.5">Sansad</th>
-                  <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 w-44 print:border-slate-800 print:text-[8pt] print:p-1.5">Job Card No</th>
-                  <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 print:border-slate-800 print:text-[8pt] print:p-1.5">Applicant Name</th>
-                  <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 print:border-slate-800 print:text-[8pt] print:p-1.5">Head of Household</th>
-                  <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 w-32 print:border-slate-800 print:text-[8pt] print:p-1.5">Village</th>
-                  <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 w-28 print:border-slate-800 print:text-[8pt] print:p-1.5">Aadhaar</th>
-                  <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 text-center w-24 print:border-slate-800 print:text-[8pt] print:p-1.5">e-KYC</th>
+                  <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 w-10 text-center print:border-slate-800 print:text-[7pt] print:p-1 print:w-[4%]">Sl</th>
+                  <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 w-24 print:border-slate-800 print:text-[7pt] print:p-1 print:w-[11%]">Sansad</th>
+                  <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 w-44 print:border-slate-800 print:text-[7pt] print:p-1 print:w-[20%]">Job Card No</th>
+                  <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 print:border-slate-800 print:text-[7pt] print:p-1 print:w-[18%]">Applicant Name</th>
+                  <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 print:border-slate-800 print:text-[7pt] print:p-1 print:w-[18%]">Head of Household</th>
+                  <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 w-32 print:border-slate-800 print:text-[7pt] print:p-1 print:w-[14%]">Village</th>
+                  <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 text-center w-28 print:border-slate-800 print:text-[7pt] print:p-1 print:w-[9%]">Aadhaar</th>
+                  <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 text-center w-24 print:border-slate-800 print:text-[7pt] print:p-1 print:w-[6%]">e-KYC</th>
                   <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider text-center no-print print:hidden action-column-header w-36" data-no-print="true">Action</th>
                 </tr>
               )}
@@ -700,7 +699,7 @@ export const VillagePdfReport: React.FC<VillagePdfReportProps> = ({
 
             {/* PRINT VIEW TBODY: Only mounted when user triggers print to guarantee instant tab switching */}
             {isPrinting && (
-              <tbody className="print-only-tbody hidden print:table-row-group divide-y divide-slate-400 text-[8pt] print:text-black">
+              <tbody className="print-only-tbody hidden print:table-row-group divide-y divide-slate-400 text-[7pt] print:text-black">
                 {rowsToPrint.map((row, idx) => {
                   const absoluteIndex = printScope === 'ALL' ? idx + 1 : ((currentPage - 1) * pageSize + idx + 1);
                   const isDone = (row.colR || '').toUpperCase() === 'YES' || (row.colR || '').toUpperCase() === 'Y';
@@ -709,29 +708,29 @@ export const VillagePdfReport: React.FC<VillagePdfReportProps> = ({
                   if (selectedCategory === 'UNIQUE_CARDS') {
                     return (
                       <tr key={`print-uc-${row.colH}-${idx}`} className="print:bg-transparent print:break-inside-avoid">
-                        <td className="p-1.5 text-center font-bold text-black border-r border-slate-300">{absoluteIndex}</td>
-                        <td className="p-1.5 font-bold text-black border-r border-slate-300 whitespace-nowrap">{row.colB}</td>
-                        <td className="p-1.5 font-mono font-bold text-black border-r border-slate-300 whitespace-nowrap">{row.colH}</td>
-                        <td className="p-1.5 font-bold text-black uppercase border-r border-slate-300">{row.colAG || '—'}</td>
-                        <td className="p-1.5 text-black uppercase border-r border-slate-300">{row.colAF || '—'}</td>
-                        <td className="p-1.5 text-black font-bold border-r border-slate-300 whitespace-nowrap">{row.colV}</td>
+                        <td className="p-1 text-center font-bold text-black border-r border-slate-400 text-[7pt]">{absoluteIndex}</td>
+                        <td className="p-1 font-bold text-black border-r border-slate-400 break-words text-[7pt]">{row.colB}</td>
+                        <td className="p-1 font-mono font-bold text-black border-r border-slate-400 break-all text-[7pt]">{row.colH}</td>
+                        <td className="p-1 font-bold text-black uppercase border-r border-slate-400 break-words text-[7pt]">{row.colAG || '—'}</td>
+                        <td className="p-1 text-black uppercase border-r border-slate-400 break-words text-[7pt]">{row.colAF || '—'}</td>
+                        <td className="p-1 text-black font-bold border-r border-slate-400 break-words text-[7pt]">{row.colV}</td>
                       </tr>
                     );
                   }
 
                   return (
                     <tr key={`print-${row.colH}-${idx}`} className="print:bg-transparent print:break-inside-avoid">
-                      <td className="p-1.5 text-center font-bold text-black border-r border-slate-300">{absoluteIndex}</td>
-                      <td className="p-1.5 font-bold text-black border-r border-slate-300 whitespace-nowrap">{row.colB}</td>
-                      <td className="p-1.5 font-mono font-bold text-black border-r border-slate-300 whitespace-nowrap">{row.colH}</td>
-                      <td className="p-1.5 font-bold text-black uppercase border-r border-slate-300">{row.colJ}</td>
-                      <td className="p-1.5 text-black uppercase border-r border-slate-300">{row.colAG || "—"}</td>
-                      <td className="p-1.5 text-black font-bold border-r border-slate-300 whitespace-nowrap">{row.colV}</td>
-                      <td className="p-1.5 font-mono text-black border-r border-slate-300 whitespace-nowrap">
+                      <td className="p-1 text-center font-bold text-black border-r border-slate-400 text-[7pt]">{absoluteIndex}</td>
+                      <td className="p-1 font-bold text-black border-r border-slate-400 break-words text-[7pt]">{row.colB}</td>
+                      <td className="p-1 font-mono font-bold text-black border-r border-slate-400 break-all text-[7pt]">{row.colH}</td>
+                      <td className="p-1 font-bold text-black uppercase border-r border-slate-400 break-words text-[7pt]">{row.colJ}</td>
+                      <td className="p-1 text-black uppercase border-r border-slate-400 break-words text-[7pt]">{row.colAG || "—"}</td>
+                      <td className="p-1 text-black font-bold border-r border-slate-400 break-words text-[7pt]">{row.colV}</td>
+                      <td className="p-1 font-mono text-black text-center border-r border-slate-400 whitespace-nowrap text-[7pt]">
                         {row.colP ? `•••• ${row.colP.slice(-4)}` : "—"}
                       </td>
-                      <td className="p-1.5 text-center border-r border-slate-300 whitespace-nowrap">
-                        <span className="inline-block px-1.5 py-0.5 border border-black font-bold uppercase text-[7pt]">
+                      <td className="p-1 text-center border-r border-slate-400">
+                        <span className="inline-block px-1 py-0.5 border border-black font-bold uppercase text-[6.5pt] leading-tight">
                           {isDone ? "Done" : isDead ? "Expired" : "Pending"}
                         </span>
                       </td>
@@ -744,25 +743,38 @@ export const VillagePdfReport: React.FC<VillagePdfReportProps> = ({
         </div>
 
         {/* OFFICIAL A4 PRINT FOOTER: Signature Block for Pradhan, GRS, and VLE */}
-        <div className="hidden print:block mt-6 pt-4 border-t-2 border-slate-900 report-sign-block">
-          <div className="grid grid-cols-3 gap-6 text-center text-[10px]">
-            <div className="border-t border-slate-400 pt-2">
-              <p className="font-bold text-slate-800">Prepared by:</p>
-              <p className="text-[9px] text-slate-600 mt-0.5">Computer Assistant / VLE</p>
-              <p className="text-[9px] font-semibold text-slate-900 mt-6">Signature with Date</p>
+        <div className="hidden print:block mt-6 pt-3 border-t-2 border-slate-900 report-sign-block">
+          <div className="grid grid-cols-3 gap-6 text-[9.5pt]">
+            {/* Left Alignment: Prepared by */}
+            <div className="text-left">
+              <p className="font-extrabold text-slate-950">Prepared by:</p>
+              <p className="text-[8.5pt] text-slate-800 font-semibold mt-0.5">Computer Assistant / VLE</p>
+              <div className="mt-7 pt-1 border-t border-slate-600 w-48 mr-auto">
+                <p className="text-[8.5pt] font-bold text-slate-950">Signature with Date</p>
+              </div>
             </div>
-            <div className="border-t border-slate-400 pt-2">
-              <p className="font-bold text-slate-800">Verified by:</p>
-              <p className="text-[9px] text-slate-600 mt-0.5">GRS / Nirman Sahayak</p>
-              <p className="text-[9px] font-semibold text-slate-900 mt-6">Signature & Official Stamp</p>
+
+            {/* Middle (Center) Alignment: Verified by */}
+            <div className="text-center">
+              <p className="font-extrabold text-slate-950">Verified by:</p>
+              <p className="text-[8.5pt] text-slate-800 font-semibold mt-0.5">GRS / Nirman Sahayak</p>
+              <div className="mt-7 pt-1 border-t border-slate-600 w-48 mx-auto">
+                <p className="text-[8.5pt] font-bold text-slate-950">Signature & Official Stamp</p>
+              </div>
             </div>
-            <div className="border-t border-slate-400 pt-2">
-              <p className="font-bold text-slate-800">Certified & Approved by:</p>
-              <p className="text-[9px] text-slate-600 mt-0.5">Pradhan / Executive Assistant</p>
-              <p className="text-[9px] font-semibold text-slate-900 mt-6">Bathuary Gram Panchayat</p>
+
+            {/* Right Alignment: Certified & Approved by */}
+            <div className="text-right">
+              <p className="font-extrabold text-slate-950">Certified & Approved by:</p>
+              <p className="text-[8.5pt] text-slate-800 font-semibold mt-0.5">Pradhan / Executive Assistant</p>
+              <div className="mt-7 pt-1 border-t border-slate-600 w-48 ml-auto text-right">
+                <p className="text-[8.5pt] font-bold text-slate-950">Bathuary Gram Panchayat</p>
+              </div>
             </div>
           </div>
-          <div className="mt-4 text-center text-[8px] text-slate-500">
+
+          {/* Bottom Footer Notice */}
+          <div className="mt-5 pt-2 border-t border-slate-400 text-center text-[7.5pt] text-slate-700 font-semibold tracking-wide">
             Generated via Bathuary Gram Panchayat e-Governance Portal • VB-GRAM G ACT • Purba Medinipur
           </div>
         </div>

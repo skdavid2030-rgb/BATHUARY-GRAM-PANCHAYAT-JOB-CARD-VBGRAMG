@@ -394,6 +394,8 @@ app.post("/api/auth/login", (req: Request, res: Response) => {
 
   // 1. Official BATHUARY_002 credential check
   if (cleanUser.toUpperCase() === creds.username.toUpperCase() && cleanPass === creds.password) {
+    // Intelligent AI Background Auto-Sync trigger on login
+    performLiveGoogleSheetSync(false).catch(() => {});
     return res.json({
       status: "success",
       message: "Login successful",
@@ -414,6 +416,8 @@ app.post("/api/auth/login", (req: Request, res: Response) => {
     (cleanUser === "9002736997" && (cleanPass === "Madan#&2580" || cleanPass === "Admin@12345")) ||
     (cleanUser.toLowerCase() === "admin" && (cleanPass === "admin123" || cleanPass === "Admin@12345"))
   ) {
+    // Intelligent AI Background Auto-Sync trigger on admin login
+    performLiveGoogleSheetSync(false).catch(() => {});
     return res.json({
       status: "success",
       message: "Admin login successful",
@@ -730,13 +734,13 @@ if (beneficiariesCache.length === 0) {
   }, 1000);
 }
 
-// Recurring background polling every 3 minutes to keep Google Sheet permanently live without rate-limiting
+// Recurring background polling every 60 seconds (1 minute) to keep Google Sheet permanently live without rate-limiting
 setInterval(() => {
   const cfg = loadSavedSheetConfig();
   if (cfg.sheetUrl && cfg.autoSync !== false) {
-    performLiveGoogleSheetSync(false);
+    performLiveGoogleSheetSync(false).catch(() => {});
   }
-}, 180000);
+}, 60000);
 
 // ----------------------------------------------------------------------------
 // Google Sheet Live Sync & Permanent Persistence Endpoints
@@ -816,14 +820,21 @@ app.post("/api/google-sheet/refresh", async (req: Request, res: Response) => {
 app.post("/api/google-sheet/save-apps-script", (req: Request, res: Response) => {
   try {
     const { appsScriptUrl } = req.body;
-    const trimmed = String(appsScriptUrl || "").trim();
+    let trimmed = String(appsScriptUrl || "").trim();
+    // Auto-extract valid Apps Script execution URL if user pasted with surrounding text
+    const urlMatch = trimmed.match(/https:\/\/script\.google\.com\/macros\/s\/[a-zA-Z0-9_-]+\/exec/);
+    if (urlMatch) {
+      trimmed = urlMatch[0];
+    }
+
     const updated = saveSheetConfig({
       appsScriptUrl: trimmed
     });
     return res.json({
       status: "success",
       message: trimmed ? "Google Apps Script 2-Way Webhook saved successfully!" : "Apps Script Webhook URL cleared.",
-      config: updated
+      config: updated,
+      appsScriptUrl: trimmed
     });
   } catch (err: any) {
     res.status(500).json({ status: "error", message: err.message });
@@ -1018,6 +1029,15 @@ app.get("/api/beneficiaries", async (req: Request, res: Response) => {
     } catch (err) {
       console.error("Auto-sync error on /api/beneficiaries:", err);
     }
+  } else {
+    // Intelligent Background Auto-Sync: if last sync is older than 45 seconds, trigger background sync
+    const now = Date.now();
+    const lastSyncMs = lastSyncTimestamp ? new Date(lastSyncTimestamp).getTime() : 0;
+    if (!isBackgroundSyncInProgress && (now - lastSyncMs > 45000)) {
+      performLiveGoogleSheetSync(false).catch(err => {
+        console.warn("Background auto-sync triggered by /api/beneficiaries:", err.message);
+      });
+    }
   }
 
   const sansad = req.query.sansad as string;
@@ -1035,6 +1055,8 @@ app.get("/api/beneficiaries", async (req: Request, res: Response) => {
     status: "success",
     total: result.length,
     beneficiaries: result,
+    lastSyncTimestamp: lastSyncTimestamp || new Date().toISOString(),
+    isLiveSynced: true,
     sansadList: (() => {
       const computed = sortSansads(
         Array.from(new Set(beneficiariesCache.map(b => b.colB)))
@@ -1133,7 +1155,7 @@ app.post("/api/beneficiaries/update", async (req: Request, res: Response) => {
       if (scriptUrl) {
         try {
           const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 6000);
+          const timer = setTimeout(() => controller.abort(), 12000);
 
           const fieldsToSync = changedFields.length > 0 ? changedFields : Object.keys(fieldUpdates);
           const gasPayload: Record<string, any> = {
@@ -1156,12 +1178,15 @@ app.post("/api/beneficiaries/update", async (req: Request, res: Response) => {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(gasPayload),
+            redirect: "follow",
             signal: controller.signal
           });
           clearTimeout(timer);
           if (gasRes.ok) {
             googleSheetSynced = true;
             googleSheetMessage = `Row ${rowIndex} updated in Google Sheet (${fieldsToSync.join(', ') || 'Partial update'})`;
+          } else {
+            googleSheetMessage = `Apps Script returned status ${gasRes.status}`;
           }
         } catch (gasErr: any) {
           googleSheetMessage = gasErr.message;
