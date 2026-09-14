@@ -68,7 +68,10 @@ export interface AppUser {
 }
 
 export interface AuditLog {
+  id?: string;
   timestamp: string;
+  action?: string;
+  rowIndex?: number;
   jobCardNumber: string;
   beneficiaryName: string;
   updatedBy: string;

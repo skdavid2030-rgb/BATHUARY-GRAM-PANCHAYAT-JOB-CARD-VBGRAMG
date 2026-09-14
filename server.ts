@@ -26,6 +26,117 @@ export const PERMANENT_DEFAULT_SHEET_URL = "https://docs.google.com/spreadsheets
 const CONFIG_FILE_PATH = path.join(process.cwd(), "google_sheet_config.json");
 const BENEFICIARIES_FILE_PATH = path.join(process.cwd(), "beneficiaries_cache.json");
 const AUTH_FILE_PATH = path.join(process.cwd(), "auth_credentials.json");
+const LOCAL_MODS_FILE_PATH = path.join(process.cwd(), "local_modifications.json");
+
+export interface LocalModification {
+  jobCard: string;
+  rowIndex?: number;
+  fields: Record<string, any>;
+  isNewEntry?: boolean;
+  fullRecord?: BeneficiaryRow;
+  status: 'pending_sheet_sync' | 'synced_to_sheet' | 'sync_failed';
+  lastAttempt?: string;
+  lastError?: string;
+  updatedAt: string;
+}
+
+function loadLocalModifications(): Record<string, LocalModification> {
+  try {
+    if (fs.existsSync(LOCAL_MODS_FILE_PATH)) {
+      const raw = fs.readFileSync(LOCAL_MODS_FILE_PATH, "utf-8");
+      return JSON.parse(raw);
+    }
+  } catch (err) {
+    console.error("Failed to load local_modifications.json:", err);
+  }
+  return {};
+}
+
+function saveLocalModifications(mods: Record<string, LocalModification>): void {
+  try {
+    fs.writeFileSync(LOCAL_MODS_FILE_PATH, JSON.stringify(mods, null, 2), "utf-8");
+  } catch (err) {
+    console.error("Failed to save local_modifications.json:", err);
+  }
+}
+
+/**
+ * Intelligent & Robust Sender for Google Apps Script Webhook
+ * Accurately parses JSON output and diagnoses Google Drive/HTML error pages
+ */
+async function sendToGoogleAppsScript(scriptUrl: string, payload: any): Promise<{ success: boolean; message: string; data?: any }> {
+  if (!scriptUrl || typeof scriptUrl !== 'string' || !scriptUrl.startsWith("https://script.google.com/")) {
+    return { success: false, message: "সঠিক Google Apps Script Webhook URL কনফিগার করা নেই।" };
+  }
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+
+    const res = await fetch(scriptUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      redirect: "follow",
+      signal: controller.signal
+    });
+    clearTimeout(timer);
+
+    const text = await res.text();
+    let json: any = null;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      // Not JSON
+    }
+
+    if (json && (json.status === "success" || json.status === "ok")) {
+      return {
+        success: true,
+        message: json.message || "গুগল স্প্রেডশীট সফলভাবে আপডেট হয়েছে (Google Sheet Updated)",
+        data: json
+      };
+    }
+
+    if (json && json.status === "error") {
+      return {
+        success: false,
+        message: `Apps Script ত্রুটি: ${json.message || "অজ্ঞাত ত্রুটি"}`,
+        data: json
+      };
+    }
+
+    // Detect Google Drive 404 / Auth error HTML pages
+    if (text.includes("<!DOCTYPE") || text.includes("<html")) {
+      if (text.includes("找不到網頁") || text.includes("Page not found") || text.includes("無法開啟這個檔案") || text.includes("File not found")) {
+        return {
+          success: false,
+          message: "Google Apps Script URL টি অচল বা মুছে ফেলা হয়েছে (Deployment Not Found)। অনুগ্রহ করে নতুন Web app ডিপ্লয় করে URL দিন।"
+        };
+      }
+      if (text.includes("accounts.google.com") || text.includes("ServiceLogin") || text.includes("Google Accounts")) {
+        return {
+          success: false,
+          message: "অনুমতি ত্রুটি (Permission Error): Apps Script ডিপ্লয় করার সময় 'Who has access' অপশনে অবশ্যই 'Anyone' (সবার জন্য) নির্বাচন করতে হবে।"
+        };
+      }
+      return {
+        success: false,
+        message: "Google Apps Script থেকে প্রত্যাশিত JSON পাওয়া যায়নি (HTML Error Page Returned)।"
+      };
+    }
+
+    return {
+      success: false,
+      message: `অপ্রত্যাশিত রেসপন্স: ${text.slice(0, 120)}`
+    };
+  } catch (err: any) {
+    if (err.name === "AbortError") {
+      return { success: false, message: "Google Apps Script সংযোগ সময়সীমা পেরিয়ে গেছে (15s Timeout)।" };
+    }
+    return { success: false, message: err.message || "Google Apps Script সংযোগে নেটওয়ার্ক ত্রুটি।" };
+  }
+}
 
 interface AuthCredentials {
   username: string;
@@ -147,6 +258,26 @@ const diskBeneficiaries = loadSavedBeneficiaries();
 let beneficiariesCache: BeneficiaryRow[] = (diskBeneficiaries && diskBeneficiaries.length > 0)
   ? diskBeneficiaries
   : [...INITIAL_BENEFICIARIES];
+
+// Apply local modifications on initial startup so local edits and additions are never lost
+const startupMods = loadLocalModifications();
+const startupJcMap = new Map<string, BeneficiaryRow>();
+beneficiariesCache.forEach(b => {
+  const key = (b.colH || '').trim().toUpperCase();
+  if (key) startupJcMap.set(key, b);
+});
+for (const [key, mod] of Object.entries(startupMods)) {
+  if (!mod) continue;
+  const jc = (mod.jobCard || '').trim().toUpperCase();
+  if (jc && startupJcMap.has(jc)) {
+    Object.assign(startupJcMap.get(jc)!, mod.fields || {});
+  } else if (mod.isNewEntry && mod.fullRecord) {
+    if (jc && !startupJcMap.has(jc)) {
+      beneficiariesCache.push(mod.fullRecord);
+      startupJcMap.set(jc, mod.fullRecord);
+    }
+  }
+}
 let usersCache: AppUser[] = [...INITIAL_USERS];
 let auditLogsCache: AuditLog[] = [];
 let activeSyncedSheetUrl: string = initialDiskConfig.sheetUrl || PERMANENT_DEFAULT_SHEET_URL;
@@ -679,6 +810,29 @@ async function performLiveGoogleSheetSync(force: boolean = false): Promise<{
     console.log(`[Permanent-Live-Sync] Pulling live data from Google Sheet: ${urlToSync}`);
     const res = await fetchAndParseGoogleSheet(urlToSync);
     if (res.beneficiaries && res.beneficiaries.length > 0) {
+      // Intelligently merge local modifications so user entries/edits are NEVER wiped out by sheet sync
+      const localMods = loadLocalModifications();
+      const jobCardMap = new Map<string, BeneficiaryRow>();
+      res.beneficiaries.forEach(b => {
+        const key = (b.colH || '').trim().toUpperCase();
+        if (key) jobCardMap.set(key, b);
+      });
+
+      // Apply modifications and preserve newly added records
+      for (const [key, mod] of Object.entries(localMods)) {
+        if (!mod) continue;
+        const jc = (mod.jobCard || '').trim().toUpperCase();
+        if (jc && jobCardMap.has(jc)) {
+          const target = jobCardMap.get(jc)!;
+          Object.assign(target, mod.fields || {});
+        } else if (mod.isNewEntry && mod.fullRecord) {
+          if (jc && !jobCardMap.has(jc)) {
+            res.beneficiaries.push(mod.fullRecord);
+            jobCardMap.set(jc, mod.fullRecord);
+          }
+        }
+      }
+
       beneficiariesCache = res.beneficiaries;
       lastSyncTimestamp = new Date().toISOString();
       activeSyncedSheetUrl = urlToSync;
@@ -693,6 +847,34 @@ async function performLiveGoogleSheetSync(force: boolean = false): Promise<{
         lastSyncStatus: `Permanent Live: Synced ${beneficiariesCache.length} records at ${new Date().toLocaleTimeString('en-IN')}`
       });
       console.log(`[Permanent-Live-Sync] Loaded ${beneficiariesCache.length} records successfully.`);
+
+      // Asynchronous background retry of any pending unsynced modifications to Google Sheet
+      const scriptUrl = cfg.appsScriptUrl || process.env.GOOGLE_APPS_SCRIPT_URL;
+      if (scriptUrl && scriptUrl.startsWith("https://script.google.com/")) {
+        const pendingKeys = Object.keys(localMods).filter(k => localMods[k].status !== 'synced_to_sheet');
+        if (pendingKeys.length > 0) {
+          setTimeout(async () => {
+            try {
+              const currentMods = loadLocalModifications();
+              for (const k of pendingKeys.slice(0, 5)) { // batch retry 5 at a time
+                const item = currentMods[k];
+                if (!item || item.status === 'synced_to_sheet') continue;
+                const payload = item.isNewEntry && item.fullRecord
+                  ? { action: "addRow", ...item.fullRecord }
+                  : { action: "updateRow", rowIndex: item.rowIndex, colH: item.jobCard, ...item.fields };
+                const pushRes = await sendToGoogleAppsScript(scriptUrl, payload);
+                if (pushRes.success) {
+                  currentMods[k].status = 'synced_to_sheet';
+                  saveLocalModifications(currentMods);
+                }
+              }
+            } catch (retryErr) {
+              console.warn("Background retry sync error:", retryErr);
+            }
+          }, 2000);
+        }
+      }
+
       return {
         success: true,
         total: beneficiariesCache.length,
@@ -817,7 +999,7 @@ app.post("/api/google-sheet/refresh", async (req: Request, res: Response) => {
 });
 
 // Save Apps Script Webhook URL (for 2-way live push)
-app.post("/api/google-sheet/save-apps-script", (req: Request, res: Response) => {
+app.post("/api/google-sheet/save-apps-script", async (req: Request, res: Response) => {
   try {
     const { appsScriptUrl } = req.body;
     let trimmed = String(appsScriptUrl || "").trim();
@@ -830,11 +1012,61 @@ app.post("/api/google-sheet/save-apps-script", (req: Request, res: Response) => 
     const updated = saveSheetConfig({
       appsScriptUrl: trimmed
     });
+
+    let testResult: { success: boolean; message: string } | null = null;
+    if (trimmed) {
+      testResult = await sendToGoogleAppsScript(trimmed, {
+        action: "ping",
+        source: "Bathuary GP Portal",
+        timestamp: new Date().toISOString()
+      });
+    }
+
     return res.json({
       status: "success",
-      message: trimmed ? "Google Apps Script 2-Way Webhook saved successfully!" : "Apps Script Webhook URL cleared.",
+      message: trimmed
+        ? (testResult?.success ? "Google Apps Script 2-Way Webhook সেভ এবং সফলভাবে যাচাই করা হয়েছে!" : "Google Apps Script Webhook URL সংরক্ষিত হয়েছে (পরীক্ষায় ত্রুটি পাওয়া গেছে)।")
+        : "Apps Script Webhook URL সরানো হয়েছে।",
       config: updated,
-      appsScriptUrl: trimmed
+      appsScriptUrl: trimmed,
+      testResult
+    });
+  } catch (err: any) {
+    res.status(500).json({ status: "error", message: err.message });
+  }
+});
+
+// Live Test Apps Script Webhook Connection
+app.post("/api/google-sheet/test-webhook", async (req: Request, res: Response) => {
+  try {
+    const { url } = req.body;
+    const cfg = loadSavedSheetConfig();
+    let scriptUrl = (url && String(url).trim()) || cfg.appsScriptUrl || process.env.GOOGLE_APPS_SCRIPT_URL;
+
+    if (scriptUrl) {
+      const urlMatch = scriptUrl.match(/https:\/\/script\.google\.com\/macros\/s\/[a-zA-Z0-9_-]+\/exec/);
+      if (urlMatch) scriptUrl = urlMatch[0];
+    }
+
+    if (!scriptUrl) {
+      return res.status(400).json({
+        status: "error",
+        message: "কোনো Webhook URL পাওয়া যায়নি। অনুগ্রহ করে Apps Script Web App URL দিন।"
+      });
+    }
+
+    const testRes = await sendToGoogleAppsScript(scriptUrl, {
+      action: "ping",
+      source: "Bathuary GP Portal Diagnostics",
+      timestamp: new Date().toISOString()
+    });
+
+    return res.json({
+      status: testRes.success ? "success" : "error",
+      success: testRes.success,
+      message: testRes.message,
+      scriptUrl,
+      data: testRes.data
     });
   } catch (err: any) {
     res.status(500).json({ status: "error", message: err.message });
@@ -1145,6 +1377,18 @@ app.post("/api/beneficiaries/update", async (req: Request, res: Response) => {
 
       saveBeneficiariesToDisk(beneficiariesCache);
 
+      // Record update to local_modifications so background auto-sync will NEVER wipe it out!
+      const currentJobCard = beneficiariesCache[idx].colH;
+      const localMods = loadLocalModifications();
+      localMods[currentJobCard] = {
+        jobCard: currentJobCard,
+        rowIndex,
+        fields: { ...beneficiariesCache[idx] },
+        status: 'pending_sheet_sync',
+        updatedAt: new Date().toISOString()
+      };
+      saveLocalModifications(localMods);
+
       // Attempt live surgical push to Google Sheet if Google Apps Script Webhook is active
       // CRITICAL: Strictly sends ONLY the modified/edited fields to Google Sheet!
       let googleSheetSynced = false;
@@ -1153,49 +1397,45 @@ app.post("/api/beneficiaries/update", async (req: Request, res: Response) => {
       const scriptUrl = cfg.appsScriptUrl || process.env.GOOGLE_APPS_SCRIPT_URL;
 
       if (scriptUrl) {
-        try {
-          const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 12000);
+        const fieldsToSync = changedFields.length > 0 ? changedFields : Object.keys(fieldUpdates);
+        const gasPayload: Record<string, any> = {
+          action: "updateRow",
+          rowIndex,
+          colH: beneficiariesCache[idx].colH,
+          colJ: beneficiariesCache[idx].colJ,
+          changedFields: fieldsToSync,
+          updates: {}
+        };
 
-          const fieldsToSync = changedFields.length > 0 ? changedFields : Object.keys(fieldUpdates);
-          const gasPayload: Record<string, any> = {
-            action: "updateRow",
-            rowIndex,
-            colH: beneficiariesCache[idx].colH,
-            colJ: beneficiariesCache[idx].colJ,
-            changedFields: fieldsToSync,
-            updates: {}
-          };
-
-          // ONLY populate the specific edited fields in the payload
-          for (const f of fieldsToSync) {
-            const val = (beneficiariesCache[idx] as any)[f];
-            gasPayload.updates[f] = val;
-            gasPayload[f] = val;
-          }
-
-          const gasRes = await fetch(scriptUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(gasPayload),
-            redirect: "follow",
-            signal: controller.signal
-          });
-          clearTimeout(timer);
-          if (gasRes.ok) {
-            googleSheetSynced = true;
-            googleSheetMessage = `Row ${rowIndex} updated in Google Sheet (${fieldsToSync.join(', ') || 'Partial update'})`;
-          } else {
-            googleSheetMessage = `Apps Script returned status ${gasRes.status}`;
-          }
-        } catch (gasErr: any) {
-          googleSheetMessage = gasErr.message;
+        // ONLY populate the specific edited fields in the payload
+        for (const f of fieldsToSync) {
+          const val = (beneficiariesCache[idx] as any)[f];
+          gasPayload.updates[f] = val;
+          gasPayload[f] = val;
         }
+
+        const gasResult = await sendToGoogleAppsScript(scriptUrl, gasPayload);
+        if (gasResult.success) {
+          googleSheetSynced = true;
+          googleSheetMessage = gasResult.message || `গুগল স্প্রেডশীটে Row ${rowIndex} সফলভাবে আপডেট হয়েছে (${fieldsToSync.join(', ')})`;
+          localMods[currentJobCard].status = 'synced_to_sheet';
+          saveLocalModifications(localMods);
+        } else {
+          googleSheetSynced = false;
+          googleSheetMessage = gasResult.message;
+          localMods[currentJobCard].status = 'sync_failed';
+          localMods[currentJobCard].lastError = gasResult.message;
+          saveLocalModifications(localMods);
+        }
+      } else {
+        googleSheetMessage = "Google Apps Script 2-Way Webhook কনফিগার করা নেই। ডেটা পোর্টালে স্থায়ীভাবে সংরক্ষিত হয়েছে।";
       }
 
       return res.json({
         status: "success",
-        message: "Data saved and verified successfully in database!",
+        message: googleSheetSynced 
+          ? "ডেটা সফলভাবে লোকাল ডেটাবেস এবং গুগল স্প্রেডশীটে লাইভ সেভ হয়েছে!" 
+          : "ডেটা পোর্টালে সংরক্ষিত হয়েছে। গুগল শীটে সেভ করতে Webhook সক্রিয় করুন।",
         googleSheetRowUrl,
         googleSheetSynced,
         googleSheetMessage,
@@ -1206,6 +1446,134 @@ app.post("/api/beneficiaries/update", async (req: Request, res: Response) => {
     }
   } catch (err: any) {
     res.status(500).json({ status: "error", message: err.message || "Failed to update record" });
+  }
+});
+
+// Create New Beneficiary Record (পোর্টালে নতুন উপভোক্তা এন্ট্রি এবং গুগল শীটে সরাসরি পুশ)
+app.post("/api/beneficiaries/create", async (req: Request, res: Response) => {
+  try {
+    const data = req.body;
+    const jc = String(data.colH || "").trim().toUpperCase();
+    const name = String(data.colJ || "").trim().toUpperCase();
+
+    if (!jc) {
+      return res.status(400).json({ status: "error", message: "জব কার্ড নম্বর (Job Card Number) আবশ্যক।" });
+    }
+    if (!name) {
+      return res.status(400).json({ status: "error", message: "উপভোক্তার নাম (Beneficiary Name) আবশ্যক।" });
+    }
+
+    // Check duplicate Job Card
+    const existing = beneficiariesCache.find(b => (b.colH || '').trim().toUpperCase() === jc);
+    if (existing) {
+      return res.status(400).json({
+        status: "error",
+        message: `জব কার্ড নম্বর '${jc}' ইতিপূর্বেই বিদ্যমান রয়েছে (সারি #${existing.rowIndex}, নাম: ${existing.colJ})। অনুগ্রহ করে 'Edit' মোড ব্যবহার করে তথ্য আপডেট করুন।`
+      });
+    }
+
+    const newRowIndex = beneficiariesCache.length + 2;
+    const newRecord: BeneficiaryRow = {
+      rowIndex: newRowIndex,
+      colA: data.colA || String(beneficiariesCache.length + 1),
+      colB: data.colB || "SANSAD-I",
+      colC: data.colC || String(beneficiariesCache.length + 1),
+      colD: data.colD || "PURBA MEDINIPUR",
+      colE: data.colE || "EGRA-I",
+      colF: data.colF || "BATHUARY",
+      colG: data.colG || "",
+      colH: jc,
+      colI: data.colI || "1",
+      colJ: name,
+      colK: data.colK || "",
+      colL: data.colL || name,
+      colM: data.colM || "NO",
+      colN: data.colN || "NO",
+      colO: data.colO || "NO",
+      colP: data.colP ? String(data.colP).replace(/\D/g, '') : "",
+      colQ: data.colQ ? String(data.colQ).replace(/\D/g, '') : "",
+      colR: data.colR || "NO",
+      colS: data.colS || "",
+      colT: data.colT || "",
+      colU: data.colU || data.updatedBy || "",
+      colV: data.colV || "",
+      colW: data.colW || "",
+      colX: data.colX || "",
+      colY: data.colY || "NO",
+      colAF: data.colAF || "",
+      colAG: data.colAG || "",
+      colAO: data.colAO || "",
+      colAP: data.colAP ? String(data.colAP).toUpperCase() : "",
+      colAQ: data.colAQ || "",
+      colAR: data.colAR || ""
+    };
+
+    beneficiariesCache.push(newRecord);
+    saveBeneficiariesToDisk(beneficiariesCache);
+
+    // Save to local_modifications
+    const localMods = loadLocalModifications();
+    localMods[jc] = {
+      jobCard: jc,
+      rowIndex: newRowIndex,
+      fields: newRecord,
+      isNewEntry: true,
+      fullRecord: newRecord,
+      status: 'pending_sheet_sync',
+      updatedAt: new Date().toISOString()
+    };
+    saveLocalModifications(localMods);
+
+    // Audit Log
+    const auditLog: AuditLog = {
+      id: `audit-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      timestamp: new Date().toISOString(),
+      action: "CREATE",
+      rowIndex: newRowIndex,
+      jobCardNumber: jc,
+      beneficiaryName: name,
+      updatedBy: data.updatedBy || "Operator"
+    };
+    auditLogsCache.unshift(auditLog);
+    if (auditLogsCache.length > 200) auditLogsCache.pop();
+
+    // Live push to Google Sheet if Apps Script Webhook configured
+    const cfg = loadSavedSheetConfig();
+    const scriptUrl = cfg.appsScriptUrl || process.env.GOOGLE_APPS_SCRIPT_URL;
+    let googleSheetSynced = false;
+    let googleSheetMessage = "";
+
+    if (scriptUrl) {
+      const gasRes = await sendToGoogleAppsScript(scriptUrl, {
+        action: "addRow",
+        ...newRecord
+      });
+      if (gasRes.success) {
+        googleSheetSynced = true;
+        googleSheetMessage = "নতুন উপভোক্তা গুগল স্প্রেডশীটে সফলভাবে যোগ করা হয়েছে!";
+        localMods[jc].status = 'synced_to_sheet';
+        saveLocalModifications(localMods);
+      } else {
+        googleSheetMessage = gasRes.message;
+        localMods[jc].status = 'sync_failed';
+        localMods[jc].lastError = gasRes.message;
+        saveLocalModifications(localMods);
+      }
+    } else {
+      googleSheetMessage = "Google Apps Script Webhook কনফিগার করা নেই। রেকর্ডটি পোর্টালে স্থায়ীভাবে সংরক্ষিত হয়েছে।";
+    }
+
+    return res.json({
+      status: "success",
+      message: googleSheetSynced 
+        ? "নতুন উপভোক্তা সফলভাবে পোর্টালে এবং গুগল স্প্রেডশীটে যুক্ত হয়েছে!" 
+        : "নতুন উপভোক্তা পোর্টালে যুক্ত হয়েছে। গুগল শীটে সেভ করতে Webhook সক্রিয় করুন।",
+      record: newRecord,
+      googleSheetSynced,
+      googleSheetMessage
+    });
+  } catch (err: any) {
+    res.status(500).json({ status: "error", message: err.message || "Failed to create new record" });
   }
 });
 

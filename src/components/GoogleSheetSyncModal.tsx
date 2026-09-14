@@ -5,6 +5,7 @@ import {
   Link2,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   X,
   RefreshCw,
   ClipboardPaste,
@@ -49,6 +50,12 @@ export const GoogleSheetSyncModal: React.FC<GoogleSheetSyncModalProps> = ({
   });
   const [appsScriptUrl, setAppsScriptUrl] = useState<string>('');
   const [hasCopiedScript, setHasCopiedScript] = useState<boolean>(false);
+  const [webhookTestStatus, setWebhookTestStatus] = useState<{
+    tested: boolean;
+    success: boolean;
+    message: string;
+  } | null>(null);
+  const [isTestingWebhook, setIsTestingWebhook] = useState<boolean>(false);
   const [autoSyncEnabled, setAutoSyncEnabled] = useState<boolean>(() => {
     return safeStorage.getItem('bathuary_auto_sync_enabled') !== 'false';
   });
@@ -382,6 +389,58 @@ export const GoogleSheetSyncModal: React.FC<GoogleSheetSyncModalProps> = ({
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Test live connection to Google Apps Script Webhook
+  const handleTestWebhook = async () => {
+    let cleanUrl = appsScriptUrl.trim();
+    const urlMatch = cleanUrl.match(/https:\/\/script\.google\.com\/macros\/s\/[a-zA-Z0-9_-]+\/exec/);
+    if (urlMatch) {
+      cleanUrl = urlMatch[0];
+      setAppsScriptUrl(cleanUrl);
+    }
+
+    if (!cleanUrl) {
+      setWebhookTestStatus({
+        tested: true,
+        success: false,
+        message: 'অনুগ্রহ করে প্রথমে একটি বৈধ Google Apps Script Web App URL দিন।'
+      });
+      return;
+    }
+
+    setIsTestingWebhook(true);
+    setWebhookTestStatus(null);
+
+    try {
+      const res = await fetch('/api/google-sheet/test-webhook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: cleanUrl })
+      });
+      const data = await res.json();
+      if (data.status === 'success' || data.success) {
+        setWebhookTestStatus({
+          tested: true,
+          success: true,
+          message: data.message || 'Webhook সংযোগ সফল! Google Sheet এ সরাসরি রাইট (Update & Add) করা সম্ভব।'
+        });
+      } else {
+        setWebhookTestStatus({
+          tested: true,
+          success: false,
+          message: data.message || 'Webhook সংযোগ ব্যর্থ হয়েছে।'
+        });
+      }
+    } catch (err: any) {
+      setWebhookTestStatus({
+        tested: true,
+        success: false,
+        message: `সংযোগ ত্রুটি: ${err.message || 'সার্ভারের সাথে যোগাযোগ করা যায়নি'}`
+      });
+    } finally {
+      setIsTestingWebhook(false);
     }
   };
 
@@ -1064,30 +1123,75 @@ export const GoogleSheetSyncModal: React.FC<GoogleSheetSyncModalProps> = ({
 
             {/* Webhook URL Input */}
             <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
-              <label className="block text-xs font-bold text-slate-800">
-                Google Apps Script Web App URL:
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold text-slate-800">
+                  Google Apps Script Web App URL:
+                </label>
+                {appsScriptUrl.trim() && (
+                  <span className="text-[10px] text-emerald-700 bg-emerald-100 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <Check className="w-3 h-3 text-emerald-600" />
+                    <span>কনফিগার করা আছে</span>
+                  </span>
+                )}
+              </div>
               <div className="flex flex-col sm:flex-row gap-2">
                 <input
                   type="text"
                   value={appsScriptUrl}
-                  onChange={(e) => setAppsScriptUrl(e.target.value)}
+                  onChange={(e) => {
+                    setAppsScriptUrl(e.target.value);
+                    setWebhookTestStatus(null);
+                  }}
                   placeholder="https://script.google.com/macros/s/AKfycb.../exec"
                   className="flex-1 bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono shadow-inner"
                 />
-                <button
-                  onClick={handleSaveAppsScriptUrl}
-                  disabled={isLoading || !appsScriptUrl.trim()}
-                  className="py-2.5 px-4 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-black text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-md transition-all shrink-0"
-                >
-                  <Save className="w-4 h-4" />
-                  <span>Save Webhook</span>
-                </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={handleTestWebhook}
+                    disabled={isTestingWebhook || !appsScriptUrl.trim()}
+                    className="py-2.5 px-3.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-amber-300 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 shadow transition-all"
+                    title="Test connection to Apps Script Webhook"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isTestingWebhook ? 'animate-spin' : ''}`} />
+                    <span>{isTestingWebhook ? 'টেস্টিং...' : '🔍 Test Webhook'}</span>
+                  </button>
+                  <button
+                    onClick={handleSaveAppsScriptUrl}
+                    disabled={isLoading || !appsScriptUrl.trim()}
+                    className="py-2.5 px-4 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-black text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-md transition-all"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>Save Webhook</span>
+                  </button>
+                </div>
               </div>
-              {appsScriptUrl.trim() && (
-                <p className="text-[11px] text-emerald-700 font-bold flex items-center gap-1">
-                  <Check className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Webhook URL সক্রিয় আছে (Two-way updates are ready)</span>
+
+              {/* Webhook Test Feedback Banner */}
+              {webhookTestStatus && (
+                <div className={`p-3 rounded-xl text-xs font-semibold border flex items-start gap-2 ${
+                  webhookTestStatus.success 
+                    ? 'bg-emerald-50 border-emerald-300 text-emerald-900' 
+                    : 'bg-rose-50 border-rose-300 text-rose-900'
+                }`}>
+                  {webhookTestStatus.success ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  ) : (
+                    <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  )}
+                  <div className="flex-1 space-y-1">
+                    <p className="font-bold">{webhookTestStatus.message}</p>
+                    {!webhookTestStatus.success && (
+                      <p className="text-[11px] text-rose-700 font-normal leading-relaxed">
+                        টিপস: গুগল শীটে <strong>Deploy &gt; Manage deployments</strong>-এ যান। নিশ্চিত করুন <strong>&quot;Who has access: Anyone&quot;</strong> সিলেক্ট করা আছে। যদি কোনো কোড এডিট করে থাকেন তবে <strong>Edit &gt; Version: New version</strong> দিয়ে পুনরায় <strong>Deploy</strong> করে নতুন Web App URL টি এখানে দিন।
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {appsScriptUrl.trim() && !webhookTestStatus && (
+                <p className="text-[11px] text-slate-500 flex items-center gap-1">
+                  <span>💡 উপরের <strong>&quot;Test Webhook&quot;</strong> বাটনে ক্লিক করে তাৎক্ষণিক নিশ্চিত হতে পারেন যে গুগল শীট লাইভ রাইটের জন্য সক্রিয় আছে কিনা।</span>
                 </p>
               )}
             </div>
@@ -1104,33 +1208,107 @@ export const GoogleSheetSyncModal: React.FC<GoogleSheetSyncModalProps> = ({
                     const scriptCode = `function getTargetSheet() {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    if (ss) return ss.getActiveSheet();
+    if (ss) {
+      var s = ss.getActiveSheet();
+      if (s) return s;
+      return ss.getSheets()[0];
+    }
   } catch (e) {}
   // Standalone fallback: opens Bathuary GP Sheet directly
-  return SpreadsheetApp.openById("1fCKKSgYo6LphZs39JURZIDZtAYBiH9JPgjOyS3Xu-PU").getActiveSheet();
+  return SpreadsheetApp.openById("1fCKKSgYo6LphZs39JURZIDZtAYBiH9JPgjOyS3Xu-PU").getSheets()[0];
 }
 
 function doGet(e) {
-  return ContentService.createTextOutput(JSON.stringify({
-    status: "ok",
-    message: "Bathuary Gram Panchayat Webhook is Active & Ready!",
-    timestamp: new Date().toISOString()
-  })).setMimeType(ContentService.MimeType.JSON);
+  try {
+    var sheet = getTargetSheet();
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "success",
+      message: "Bathuary GP Google Apps Script Webhook is Active & Connected!",
+      sheetName: sheet.getName(),
+      totalRows: sheet.getLastRow(),
+      timestamp: new Date().toISOString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "error",
+      message: err.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
 }
 
 function doPost(e) {
   try {
     if (!e || !e.postData || !e.postData.contents) {
-      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "No data received" }))
+      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "No data payload received" }))
         .setMimeType(ContentService.MimeType.JSON);
     }
     var data = JSON.parse(e.postData.contents);
     var sheet = getTargetSheet();
+
+    // Ping / Diagnostic Action
+    if (data.action === "ping" || data.action === "test") {
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "success",
+        message: "Webhook সংযোগ সফল! Google Sheet সরাসরি আপডেট করার জন্য প্রস্তুত।",
+        sheetName: sheet.getName(),
+        totalRows: sheet.getLastRow(),
+        timestamp: new Date().toISOString()
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // Add New Beneficiary Entry Action
+    if (data.action === "addRow") {
+      var rowValues = [];
+      rowValues[0] = data.colA || String(sheet.getLastRow()); // Col A SL
+      rowValues[1] = data.colB || ""; // Col B Sansad
+      rowValues[2] = data.colC || ""; // Col C
+      rowValues[3] = data.colD || "PURBA MEDINIPUR"; // Col D
+      rowValues[4] = data.colE || "EGRA-I"; // Col E
+      rowValues[5] = data.colF || "BATHUARY"; // Col F
+      rowValues[6] = data.colG || ""; // Col G
+      rowValues[7] = data.colH || ""; // Col H Job Card
+      rowValues[8] = data.colI || "1"; // Col I Applicant No
+      rowValues[9] = data.colJ || ""; // Col J Applicant Name
+      rowValues[10] = data.colK || ""; // Col K Gender
+      rowValues[11] = data.colL || ""; // Col L Age
+      rowValues[12] = data.colM || ""; // Col M Category
+      rowValues[13] = data.colN || ""; // Col N Head of House
+      rowValues[14] = data.colO || ""; // Col O Father/Husband
+      rowValues[15] = data.colP ? "'" + String(data.colP) : ""; // Col P Aadhaar
+      rowValues[16] = data.colQ ? "'" + String(data.colQ) : ""; // Col Q Mobile
+      rowValues[17] = data.colR || "NO"; // Col R e-KYC
+      rowValues[18] = data.colS || ""; // Col S Date
+      rowValues[19] = data.colT || ""; // Col T Remark/Reason
+      rowValues[20] = data.colU || ""; // Col U Processed By
+      rowValues[21] = data.colV || ""; // Col V Village
+      rowValues[22] = data.colW || ""; // Col W Delivered To
+      rowValues[23] = data.colX || ""; // Col X Delivery Date
+      rowValues[24] = data.colY || "NO"; // Col Y Book Delivered
+      for (var col = 25; col <= 39; col++) {
+        rowValues[col] = "";
+      }
+      rowValues[40] = data.colAO || ""; // Col AO Bank Name
+      rowValues[41] = data.colAP || ""; // Col AP IFSC
+      rowValues[42] = data.colAQ || ""; // Col AQ Branch
+      rowValues[43] = data.colAR ? "'" + String(data.colAR) : ""; // Col AR Account
+
+      sheet.appendRow(rowValues);
+      SpreadsheetApp.flush();
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "success",
+        message: "নতুন উপভোক্তা গুগল স্প্রেডশীটে সফলভাবে যোগ করা হয়েছে!",
+        row: sheet.getLastRow(),
+        jobCard: data.colH
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // Update Row Action
     var rowIndex = Number(data.rowIndex);
     var jobCard = String(data.colH || "").trim();
     var targetRow = rowIndex;
 
-    if (!targetRow || targetRow < 2) {
+    // Search row by Job Card Number (Col 8 = Col H)
+    if (jobCard) {
       var dataRange = sheet.getDataRange().getValues();
       for (var r = 1; r < dataRange.length; r++) {
         if (String(dataRange[r][7] || "").trim() === jobCard) {
@@ -1140,43 +1318,50 @@ function doPost(e) {
       }
     }
 
-    if (targetRow && targetRow >= 2) {
-      var u = data.updates || data;
-      // Col 16: P = Aadhaar
-      if (u.colP !== undefined) sheet.getRange(targetRow, 16).setValue(String(u.colP));
-      // Col 17: Q = Mobile
-      if (u.colQ !== undefined) sheet.getRange(targetRow, 17).setValue(String(u.colQ));
-      // Col 18: R = e-KYC Status
-      if (u.colR !== undefined) sheet.getRange(targetRow, 18).setValue(String(u.colR));
-      // Col 19: S = e-KYC Date
-      if (u.colS !== undefined) sheet.getRange(targetRow, 19).setValue(String(u.colS));
-      // Col 20: T = Remark / Reason
-      if (u.colT !== undefined) sheet.getRange(targetRow, 20).setValue(String(u.colT));
-      // Col 21: U = VLE / Operator
-      if (u.colU !== undefined) sheet.getRange(targetRow, 21).setValue(String(u.colU));
-      // Col 22: V = Village
-      if (u.colV !== undefined) sheet.getRange(targetRow, 22).setValue(String(u.colV));
-      // Col 23: W = Delivered To
-      if (u.colW !== undefined) sheet.getRange(targetRow, 23).setValue(String(u.colW));
-      // Col 24: X = Delivery Date
-      if (u.colX !== undefined) sheet.getRange(targetRow, 24).setValue(String(u.colX));
-      // Col 25: Y = Job Card Book Delivered
-      if (u.colY !== undefined) sheet.getRange(targetRow, 25).setValue(String(u.colY));
-      // Col 41: AO = Bank Name
-      if (u.colAO !== undefined) sheet.getRange(targetRow, 41).setValue(String(u.colAO));
-      // Col 42: AP = IFSC Code
-      if (u.colAP !== undefined) sheet.getRange(targetRow, 42).setValue(String(u.colAP));
-      // Col 43: AQ = Branch Name
-      if (u.colAQ !== undefined) sheet.getRange(targetRow, 43).setValue(String(u.colAQ));
-      // Col 44: AR = Bank Account No
-      if (u.colAR !== undefined) sheet.getRange(targetRow, 44).setValue(String(u.colAR));
-
-      SpreadsheetApp.flush();
-      return ContentService.createTextOutput(JSON.stringify({ status: "success", row: targetRow, jobCard: jobCard }))
-        .setMimeType(ContentService.MimeType.JSON);
+    if (!targetRow || targetRow < 2) {
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "error",
+        message: "Row not found for Job Card: " + jobCard
+      })).setMimeType(ContentService.MimeType.JSON);
     }
-    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "Row not found for Job Card: " + jobCard }))
-      .setMimeType(ContentService.MimeType.JSON);
+
+    var u = data.updates || data;
+    // Col 16: P = Aadhaar
+    if (u.colP !== undefined) sheet.getRange(targetRow, 16).setValue(u.colP ? "'" + String(u.colP) : "");
+    // Col 17: Q = Mobile
+    if (u.colQ !== undefined) sheet.getRange(targetRow, 17).setValue(u.colQ ? "'" + String(u.colQ) : "");
+    // Col 18: R = e-KYC Status
+    if (u.colR !== undefined) sheet.getRange(targetRow, 18).setValue(String(u.colR));
+    // Col 19: S = e-KYC Date
+    if (u.colS !== undefined) sheet.getRange(targetRow, 19).setValue(String(u.colS));
+    // Col 20: T = Remark / Reason
+    if (u.colT !== undefined) sheet.getRange(targetRow, 20).setValue(String(u.colT));
+    // Col 21: U = VLE / Operator
+    if (u.colU !== undefined) sheet.getRange(targetRow, 21).setValue(String(u.colU));
+    // Col 22: V = Village
+    if (u.colV !== undefined) sheet.getRange(targetRow, 22).setValue(String(u.colV));
+    // Col 23: W = Delivered To
+    if (u.colW !== undefined) sheet.getRange(targetRow, 23).setValue(String(u.colW));
+    // Col 24: X = Delivery Date
+    if (u.colX !== undefined) sheet.getRange(targetRow, 24).setValue(String(u.colX));
+    // Col 25: Y = Job Card Book Delivered
+    if (u.colY !== undefined) sheet.getRange(targetRow, 25).setValue(String(u.colY));
+    // Col 41: AO = Bank Name
+    if (u.colAO !== undefined) sheet.getRange(targetRow, 41).setValue(String(u.colAO));
+    // Col 42: AP = IFSC Code
+    if (u.colAP !== undefined) sheet.getRange(targetRow, 42).setValue(String(u.colAP));
+    // Col 43: AQ = Branch Name
+    if (u.colAQ !== undefined) sheet.getRange(targetRow, 43).setValue(String(u.colAQ));
+    // Col 44: AR = Bank Account No
+    if (u.colAR !== undefined) sheet.getRange(targetRow, 44).setValue(u.colAR ? "'" + String(u.colAR) : "");
+
+    SpreadsheetApp.flush();
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "success",
+      message: "Row " + targetRow + " updated successfully in Google Sheet",
+      row: targetRow,
+      jobCard: jobCard
+    })).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() }))
       .setMimeType(ContentService.MimeType.JSON);
