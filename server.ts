@@ -13,6 +13,7 @@ import { BeneficiaryRow, AppUser, AuditLog, GoogleSheetConfig } from "./src/type
 import { normalizeVillageName, CANONICAL_29_VILLAGES } from "./src/utils/villageNormalizer";
 import { normalizeSansadName, CANONICAL_16_SANSADS, isHeaderOrJunkSansad, sortSansads } from "./src/utils/sansadNormalizer";
 import { formatKycDate } from "./src/utils/dateFormatter";
+import { normalizeJobCardBookDelivered } from "./src/utils/jobCardDeliveryNormalizer";
 
 dotenv.config();
 
@@ -62,8 +63,64 @@ function saveLocalModifications(mods: Record<string, LocalModification>): void {
 
 /**
  * Intelligent & Robust Sender for Google Apps Script Webhook
- * Accurately parses JSON output and diagnoses Google Drive/HTML error pages
+ * Supports both GET and POST, case-insensitive status ('SUCCESS', 'CONNECTED', 'OK'),
+ * and diagnoses Google Drive/HTML error pages.
  */
+async function sendGetToGoogleAppsScript(url: string): Promise<{ success: boolean; message: string; data?: any }> {
+  if (!url || typeof url !== 'string' || !url.startsWith("https://script.google.com/")) {
+    return { success: false, message: "সঠিক Google Apps Script Webhook URL কনফিগার করা নেই।" };
+  }
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 12000);
+
+    const res = await fetch(url, {
+      method: "GET",
+      headers: { "Accept": "application/json, text/plain, */*" },
+      redirect: "follow",
+      signal: controller.signal
+    });
+    clearTimeout(timer);
+
+    const text = await res.text();
+    let json: any = null;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      // Non-JSON response
+    }
+
+    if (json) {
+      const s = String(json.status || "").toUpperCase();
+      if (s === "CONNECTED" || s === "SUCCESS" || s === "OK") {
+        return {
+          success: true,
+          message: json.message || "Google Apps Script Engine সক্রিয় রয়েছে।",
+          data: json
+        };
+      }
+      if (s === "ERROR" || s === "NOT_FOUND") {
+        return {
+          success: false,
+          message: json.message || `Apps Script ত্রুটি: ${s}`,
+          data: json
+        };
+      }
+    }
+
+    return {
+      success: false,
+      message: text.includes("<html") ? "Google Apps Script থেকে HTML পেজ এসেছে। অনুমতি ও এক্সেস যাচাই করুন।" : `রেসপন্স: ${text.slice(0, 100)}`
+    };
+  } catch (err: any) {
+    if (err.name === "AbortError") {
+      return { success: false, message: "Google Apps Script সংযোগ সময়সীমা পেরিয়ে গেছে (12s Timeout)।" };
+    }
+    return { success: false, message: err.message || "Google Apps Script সংযোগে নেটওয়ার্ক ত্রুটি।" };
+  }
+}
+
 async function sendToGoogleAppsScript(scriptUrl: string, payload: any): Promise<{ success: boolean; message: string; data?: any }> {
   if (!scriptUrl || typeof scriptUrl !== 'string' || !scriptUrl.startsWith("https://script.google.com/")) {
     return { success: false, message: "সঠিক Google Apps Script Webhook URL কনফিগার করা নেই।" };
@@ -90,20 +147,31 @@ async function sendToGoogleAppsScript(scriptUrl: string, payload: any): Promise<
       // Not JSON
     }
 
-    if (json && (json.status === "success" || json.status === "ok")) {
-      return {
-        success: true,
-        message: json.message || "গুগল স্প্রেডশীট সফলভাবে আপডেট হয়েছে (Google Sheet Updated)",
-        data: json
-      };
-    }
+    if (json) {
+      const s = String(json.status || "").toUpperCase();
+      if (s === "SUCCESS" || s === "CONNECTED" || s === "OK") {
+        return {
+          success: true,
+          message: json.message || "গুগল স্প্রেডশীট সফলভাবে আপডেট হয়েছে (Google Sheet Updated)",
+          data: json
+        };
+      }
 
-    if (json && json.status === "error") {
-      return {
-        success: false,
-        message: `Apps Script ত্রুটি: ${json.message || "অজ্ঞাত ত্রুটি"}`,
-        data: json
-      };
+      if (s === "NOT_FOUND") {
+        return {
+          success: false,
+          message: json.message || `জব কার্ড স্প্রেডশীটে পাওয়া যায়নি (${payload.jobCardNumber || payload.colH || ""})`,
+          data: json
+        };
+      }
+
+      if (s === "ERROR") {
+        return {
+          success: false,
+          message: `Apps Script ত্রুটি: ${json.message || "অজ্ঞাত ত্রুটি"}`,
+          data: json
+        };
+      }
     }
 
     // Detect Google Drive 404 / Auth error HTML pages
@@ -316,7 +384,39 @@ function parseAndMapSheetRows(rawData: any[][]): BeneficiaryRow[] {
       row.forEach((colVal, colIdx) => {
         const val = String(colVal || '').toLowerCase().trim();
         if (!val) return;
-        if (val === 'job card number' || (val.includes('job') && (val.includes('card') || val.includes('no') || val.includes('num')) && !val.includes('applicant'))) colMap['colH'] = colIdx;
+        // Priority 1: Col Y - Job Card Book Delivered (Must check BEFORE generic Job Card checks!)
+        if (
+          val.includes('book') || 
+          val.includes('deliver') || 
+          val.includes('deliv') ||
+          val.includes('বই') || 
+          val.includes('বিতরণ') || 
+          val.includes('বিলি') ||
+          val === 'jc book' ||
+          val === 'book delivered' ||
+          val === 'job card book delivered'
+        ) {
+          colMap['colY'] = colIdx;
+        }
+        // Priority 2: Col W - Job Card Submitted to Office
+        else if (
+          val.includes('submitted') || 
+          val.includes('submission') || 
+          val.includes('জমা')
+        ) {
+          colMap['colW'] = colIdx;
+        }
+        // Priority 3: Col H - Job Card Number
+        else if (
+          val === 'job card number' || 
+          val === 'job card no' || 
+          val === 'job card no.' || 
+          val === 'job card' || 
+          val === 'reg no' ||
+          ((val.includes('job') || val.includes('কার্ড')) && (val.includes('card') || val.includes('no') || val.includes('num') || val.includes('নম্বর')))
+        ) {
+          colMap['colH'] = colIdx;
+        }
         else if (val === 'applicant name' || (val.includes('applicant') && val.includes('name') && !val.includes('job card'))) colMap['colJ'] = colIdx;
         else if (val === 'name' || val.includes('beneficiary') || val.includes('worker')) colMap['colJ'] = colIdx;
         else if (val.includes('father') || val.includes('husband')) colMap['colAF'] = colIdx;
@@ -334,7 +434,6 @@ function parseAndMapSheetRows(rawData: any[][]): BeneficiaryRow[] {
         else if (val.includes('account') || val.includes('a/c') || val.includes('ac no') || val.includes('acc no')) colMap['colAR'] = colIdx;
         else if (val.includes('remark') || val.includes('error') || val.includes('reason')) colMap['colT'] = colIdx;
         else if (val.includes('vle') || val.includes('officer') || val.includes('grs')) colMap['colU'] = colIdx;
-        else if (val.includes('delivered') || (val.includes('book') && val.includes('deliver')) || val.includes('job card book')) colMap['colY'] = colIdx;
       });
       break;
     }
@@ -425,7 +524,7 @@ function parseAndMapSheetRows(rawData: any[][]): BeneficiaryRow[] {
       colV: normalizedVillage,
       colW: get('colW', 22) || 'Yes',
       colX: get('colX', 23) || '',
-      colY: get('colY', 24) || '',
+      colY: normalizeJobCardBookDelivered(get('colY', 24)),
       colAF: get('colAF', 31).toUpperCase(),
       colAG: get('colAG', 32).toUpperCase() || (name || '').toUpperCase(),
       ...(() => {
@@ -544,7 +643,7 @@ app.post("/api/auth/login", (req: Request, res: Response) => {
 
   // 2. Administrative master fallback
   if (
-    (cleanUser === "9002736997" && (cleanPass === "Madan#&2580" || cleanPass === "Admin@12345")) ||
+    (cleanUser === "9002736997" && cleanPass === "Admin@12345") ||
     (cleanUser.toLowerCase() === "admin" && (cleanPass === "admin123" || cleanPass === "Admin@12345"))
   ) {
     // Intelligent AI Background Auto-Sync trigger on admin login
@@ -642,8 +741,61 @@ app.post("/api/rbi/autofix", (req: Request, res: Response) => {
 
 // ----------------------------------------------------------------------------
 /**
+ * Directly reads beneficiaries via Google Apps Script Web App (Code.gs)
+ */
+async function fetchBeneficiariesFromAppsScript(scriptUrl: string): Promise<{
+  beneficiaries: BeneficiaryRow[];
+  uniqueVillages: string[];
+  uniqueSansads: string[];
+  sheetId: string;
+}> {
+  console.log(`[Code.gs-Read] Fetching live data via Google Apps Script: ${scriptUrl}`);
+  const fetchUrl = scriptUrl.includes("?") 
+    ? `${scriptUrl}&action=getBeneficiaries` 
+    : `${scriptUrl}?action=getBeneficiaries`;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20000);
+
+  const response = await fetch(fetchUrl, {
+    method: "GET",
+    headers: {
+      "Accept": "application/json, text/plain, */*",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    },
+    signal: controller.signal,
+    redirect: "follow"
+  });
+  clearTimeout(timer);
+
+  if (!response.ok) {
+    throw new Error(`Google Apps Script returned HTTP ${response.status}`);
+  }
+
+  const json: any = await response.json();
+  if (json.status !== "SUCCESS" || !Array.isArray(json.beneficiaries)) {
+    throw new Error(json.message || "Failed to parse records from Code.gs");
+  }
+
+  const beneficiaries: BeneficiaryRow[] = json.beneficiaries.map((b: any) => ({
+    ...b,
+    colY: normalizeJobCardBookDelivered(b.colY)
+  }));
+
+  const uniqueVillages = Array.from(new Set(beneficiaries.map(b => b.colV).filter(Boolean))).sort() as string[];
+  const uniqueSansads = Array.from(new Set(beneficiaries.map(b => b.colB).filter(Boolean))).sort() as string[];
+
+  return {
+    beneficiaries,
+    uniqueVillages,
+    uniqueSansads,
+    sheetId: "APPS_SCRIPT_LIVE"
+  };
+}
+
+/**
  * Core Google Sheet Fetcher & Parser
- * Handles public links, export CSV, gviz endpoints, and auth redirects
+ * Handles public links, export CSV, gviz endpoints, and Google Apps Script Code.gs
  */
 async function fetchAndParseGoogleSheet(rawUrl: string): Promise<{
   beneficiaries: BeneficiaryRow[];
@@ -654,7 +806,7 @@ async function fetchAndParseGoogleSheet(rawUrl: string): Promise<{
   const trimmedUrl = rawUrl.trim();
 
   if (trimmedUrl.includes("script.google.com")) {
-    throw new Error("You provided a Google Apps Script link. Please use your Google Spreadsheet link (https://docs.google.com/spreadsheets/d/.../edit).");
+    return await fetchBeneficiariesFromAppsScript(trimmedUrl);
   }
 
   // 1. Extract GID (Sheet tab)
@@ -1055,11 +1207,19 @@ app.post("/api/google-sheet/test-webhook", async (req: Request, res: Response) =
       });
     }
 
-    const testRes = await sendToGoogleAppsScript(scriptUrl, {
-      action: "ping",
-      source: "Bathuary GP Portal Diagnostics",
-      timestamp: new Date().toISOString()
-    });
+    // 1. First test via GET ?api=ping (standard handler in user's mobile app Code.gs)
+    const pingUrl = scriptUrl + (scriptUrl.includes("?") ? "&" : "?") + "api=ping";
+    let testRes = await sendGetToGoogleAppsScript(pingUrl);
+
+    // 2. If GET was not recognized, fallback to POST with ping diagnostics
+    if (!testRes.success) {
+      testRes = await sendToGoogleAppsScript(scriptUrl, {
+        action: "ping",
+        api: "ping",
+        source: "Bathuary GP Portal Diagnostics",
+        timestamp: new Date().toISOString()
+      });
+    }
 
     return res.json({
       status: testRes.success ? "success" : "error",
@@ -1329,7 +1489,8 @@ app.post("/api/beneficiaries/update", async (req: Request, res: Response) => {
       if (changedFields.length > 0) {
         for (const field of changedFields) {
           if (formData[field] !== undefined) {
-            (beneficiariesCache[idx] as any)[field] = formData[field];
+            const val = field === 'colY' ? normalizeJobCardBookDelivered(formData[field]) : formData[field];
+            (beneficiariesCache[idx] as any)[field] = val;
           }
         }
       } else {
@@ -1345,7 +1506,7 @@ app.post("/api/beneficiaries/update", async (req: Request, res: Response) => {
           colV: formData.colV !== undefined ? formData.colV : beneficiariesCache[idx].colV,
           colW: formData.colW !== undefined ? formData.colW : beneficiariesCache[idx].colW,
           colX: formData.colX !== undefined ? formData.colX : beneficiariesCache[idx].colX,
-          colY: formData.colY !== undefined ? formData.colY : (beneficiariesCache[idx].colY || ''),
+          colY: formData.colY !== undefined ? normalizeJobCardBookDelivered(formData.colY) : (beneficiariesCache[idx].colY || ''),
           colAO: formData.colAO !== undefined ? formData.colAO : beneficiariesCache[idx].colAO,
           colAP: formData.colAP !== undefined ? formData.colAP : beneficiariesCache[idx].colAP,
           colAQ: formData.colAQ !== undefined ? formData.colAQ : beneficiariesCache[idx].colAQ,
@@ -1398,20 +1559,80 @@ app.post("/api/beneficiaries/update", async (req: Request, res: Response) => {
 
       if (scriptUrl) {
         const fieldsToSync = changedFields.length > 0 ? changedFields : Object.keys(fieldUpdates);
+        const record = beneficiariesCache[idx];
         const gasPayload: Record<string, any> = {
           action: "updateRow",
           rowIndex,
-          colH: beneficiariesCache[idx].colH,
-          colJ: beneficiariesCache[idx].colJ,
-          changedFields: fieldsToSync,
+          colH: record.colH,
+          jobCardNumber: record.colH,
+          applicantNo: record.colI || "1",
+          colI: record.colI || "1",
+          applicantName: record.colJ,
+          colJ: record.colJ,
+          userId: formData.updatedBy || "9002736997",
+          updaterMobile: formData.updatedBy || "9002736997",
+          userName: formData.userName || "Web Portal",
+          userRole: formData.userRole || "ADMIN",
+          changesSummary: fieldsToSync.length > 0 ? `Updated ${fieldsToSync.join(', ')}` : "Updated beneficiary details",
+          updatedAtIST: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
+          changedFields: [...fieldsToSync],
           updates: {}
         };
 
-        // ONLY populate the specific edited fields in the payload
+        // SURGICAL MOBILE-APP SYNC: ONLY populate the specific edited fields in payload
         for (const f of fieldsToSync) {
-          const val = (beneficiariesCache[idx] as any)[f];
+          const val = f === 'colY' 
+            ? normalizeJobCardBookDelivered((beneficiariesCache[idx] as any)[f]) 
+            : (beneficiariesCache[idx] as any)[f];
           gasPayload.updates[f] = val;
           gasPayload[f] = val;
+          if (f === 'colY') {
+            gasPayload.jobCardBookDelivered = val;
+            if (!gasPayload.changedFields.includes('jobCardBookDelivered')) {
+              gasPayload.changedFields.push('jobCardBookDelivered');
+            }
+          } else if (f === 'colW') {
+            gasPayload.jobCardSubmitted = val;
+            if (!gasPayload.changedFields.includes('jobCardSubmitted')) {
+              gasPayload.changedFields.push('jobCardSubmitted');
+            }
+          } else if (f === 'colP') {
+            gasPayload.aadhaarNumber = val;
+            if (!gasPayload.changedFields.includes('aadhaarNumber')) gasPayload.changedFields.push('aadhaarNumber');
+          } else if (f === 'colQ') {
+            gasPayload.workerPhone = val;
+            if (!gasPayload.changedFields.includes('workerPhone')) gasPayload.changedFields.push('workerPhone');
+          } else if (f === 'colR') {
+            gasPayload.eKycDone = val;
+            if (!gasPayload.changedFields.includes('eKycDone')) gasPayload.changedFields.push('eKycDone');
+          } else if (f === 'colS') {
+            gasPayload.eKycDate = val;
+            if (!gasPayload.changedFields.includes('eKycDate')) gasPayload.changedFields.push('eKycDate');
+          } else if (f === 'colT') {
+            gasPayload.eKycError = val;
+            if (!gasPayload.changedFields.includes('eKycError')) gasPayload.changedFields.push('eKycError');
+          } else if (f === 'colU') {
+            gasPayload.eKycDoneBy = val;
+            if (!gasPayload.changedFields.includes('eKycDoneBy')) gasPayload.changedFields.push('eKycDoneBy');
+          } else if (f === 'colV') {
+            gasPayload.villageName = val;
+            if (!gasPayload.changedFields.includes('villageName')) gasPayload.changedFields.push('villageName');
+          } else if (f === 'colX') {
+            gasPayload.remark = val;
+            if (!gasPayload.changedFields.includes('remark')) gasPayload.changedFields.push('remark');
+          } else if (f === 'colAO') {
+            gasPayload.bankName = val;
+            if (!gasPayload.changedFields.includes('bankName')) gasPayload.changedFields.push('bankName');
+          } else if (f === 'colAP') {
+            gasPayload.ifscCode = val;
+            if (!gasPayload.changedFields.includes('ifscCode')) gasPayload.changedFields.push('ifscCode');
+          } else if (f === 'colAQ') {
+            gasPayload.branchName = val;
+            if (!gasPayload.changedFields.includes('branchName')) gasPayload.changedFields.push('branchName');
+          } else if (f === 'colAR') {
+            gasPayload.accountNumber = val;
+            if (!gasPayload.changedFields.includes('accountNumber')) gasPayload.changedFields.push('accountNumber');
+          }
         }
 
         const gasResult = await sendToGoogleAppsScript(scriptUrl, gasPayload);
@@ -1546,6 +1767,18 @@ app.post("/api/beneficiaries/create", async (req: Request, res: Response) => {
     if (scriptUrl) {
       const gasRes = await sendToGoogleAppsScript(scriptUrl, {
         action: "addRow",
+        jobCardNumber: jc,
+        colH: jc,
+        applicantName: name,
+        colJ: name,
+        applicantNo: "1",
+        colI: "1",
+        userId: data.updatedBy || "9002736997",
+        updaterMobile: data.updatedBy || "9002736997",
+        userName: "Web Portal",
+        userRole: "ADMIN",
+        changesSummary: "Added new citizen Job Card entry",
+        updatedAtIST: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
         ...newRecord
       });
       if (gasRes.success) {

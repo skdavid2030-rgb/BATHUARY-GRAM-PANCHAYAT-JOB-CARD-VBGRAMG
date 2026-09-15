@@ -29,6 +29,7 @@ import { BeneficiaryRow, GoogleSheetConfig, PERMANENT_BATHUARY_SHEET_URL } from 
 import { normalizeVillageName, CANONICAL_29_VILLAGES } from '../utils/villageNormalizer';
 import { normalizeSansadName, CANONICAL_16_SANSADS, isHeaderOrJunkSansad } from '../utils/sansadNormalizer';
 import { formatKycDate } from '../utils/dateFormatter';
+import { normalizeJobCardBookDelivered } from '../utils/jobCardDeliveryNormalizer';
 import { safeStorage } from '../utils/safeStorage';
 
 interface GoogleSheetSyncModalProps {
@@ -467,7 +468,39 @@ export const GoogleSheetSyncModal: React.FC<GoogleSheetSyncModalProps> = ({
         row.forEach((colVal, colIdx) => {
           const val = String(colVal || '').toLowerCase().trim();
           if (!val) return;
-          if (val.includes('job') && (val.includes('card') || val.includes('no') || val.includes('num'))) colMap['colH'] = colIdx;
+          // Priority 1: Col Y - Job Card Book Delivered (Check BEFORE generic Job Card!)
+          if (
+            val.includes('book') || 
+            val.includes('deliver') || 
+            val.includes('deliv') || 
+            val.includes('বই') || 
+            val.includes('বিতরণ') || 
+            val.includes('বিলি') ||
+            val === 'jc book' ||
+            val === 'book delivered' ||
+            val === 'job card book delivered'
+          ) {
+            colMap['colY'] = colIdx;
+          }
+          // Priority 2: Col W - Job Card Submitted to Office
+          else if (
+            val.includes('submitted') || 
+            val.includes('submission') || 
+            val.includes('জমা')
+          ) {
+            colMap['colW'] = colIdx;
+          }
+          // Priority 3: Col H - Job Card Number
+          else if (
+            val === 'job card number' || 
+            val === 'job card no' || 
+            val === 'job card no.' || 
+            val === 'job card' || 
+            val === 'reg no' ||
+            ((val.includes('job') || val.includes('কার্ড')) && (val.includes('card') || val.includes('no') || val.includes('num') || val.includes('নম্বর')))
+          ) {
+            colMap['colH'] = colIdx;
+          }
           else if (val.includes('applicant') && val.includes('name')) colMap['colJ'] = colIdx;
           else if (val === 'name' || val.includes('beneficiary') || val.includes('worker')) colMap['colJ'] = colIdx;
           else if (val.includes('father') || val.includes('husband')) colMap['colAF'] = colIdx;
@@ -485,7 +518,6 @@ export const GoogleSheetSyncModal: React.FC<GoogleSheetSyncModalProps> = ({
           else if (val.includes('account') || val.includes('a/c') || val.includes('ac no') || val.includes('acc no')) colMap['colAR'] = colIdx;
           else if (val.includes('remark') || val.includes('error') || val.includes('reason')) colMap['colT'] = colIdx;
           else if (val.includes('vle') || val.includes('officer') || val.includes('grs')) colMap['colU'] = colIdx;
-          else if (val.includes('delivered') || (val.includes('book') && val.includes('deliver')) || val.includes('job card book')) colMap['colY'] = colIdx;
         });
         break;
       }
@@ -570,7 +602,7 @@ export const GoogleSheetSyncModal: React.FC<GoogleSheetSyncModalProps> = ({
         colV: normalizedVillage,
         colW: get('colW', 22) || 'Yes',
         colX: get('colX', 23) || '',
-        colY: get('colY', 24) || '',
+        colY: normalizeJobCardBookDelivered(get('colY', 24)),
         colAF: get('colAF', 31) || '',
         colAG: get('colAG', 32) || name,
         colAO: get('colAO', 40) || 'BANK OF INDIA',
@@ -1205,167 +1237,728 @@ export const GoogleSheetSyncModal: React.FC<GoogleSheetSyncModalProps> = ({
                 </div>
                 <button
                   onClick={() => {
-                    const scriptCode = `function getTargetSheet() {
-  try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    if (ss) {
-      var s = ss.getActiveSheet();
-      if (s) return s;
-      return ss.getSheets()[0];
-    }
-  } catch (e) {}
-  // Standalone fallback: opens Bathuary GP Sheet directly
-  return SpreadsheetApp.openById("1fCKKSgYo6LphZs39JURZIDZtAYBiH9JPgjOyS3Xu-PU").getSheets()[0];
-}
+                    const scriptCode = `// ============================================================================
+// Bathuary Gram Panchayat MGNREGA Web Portal & Android Mobile App Unified Code.gs
+// Target Spreadsheet ID: 1fCKKSgYo6LphZs39JURZIDZtAYBiH9JPgjOyS3Xu-PU
+// Target Sheet Name: BATHUARY ALL
+// ============================================================================
 
 function doGet(e) {
-  try {
-    var sheet = getTargetSheet();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var action = (e && e.parameter && e.parameter.action) ? e.parameter.action.toString().trim() : "";
+  
+  if (action === "getUsers" || action === "syncUsers") {
+    return handleGetUsers(ss);
+  }
+  if (action === "getAuditLogs" || action === "syncAuditLogs") {
+    return handleGetAuditLogs(ss);
+  }
+  if (action === "clearAuditLogs" || action === "deleteAuditLogs") {
+    return handleClearAuditLogs(ss);
+  }
+  if (action === "getData" || action === "readData" || action === "getBeneficiaries" || action === "readSheet") {
+    return handleGetBeneficiaries(ss, e && e.parameter ? e.parameter : {});
+  }
+  if (e && e.parameter && (e.parameter.api === "ping" || e.parameter.action === "ping")) {
+    var usersSheet = ss.getSheetByName("USERS");
+    var auditSheet = ss.getSheetByName("AUDIT_LOGS");
+    var totalUsers = usersSheet ? Math.max(0, usersSheet.getLastRow() - 1) : 0;
+    var totalLogs = auditSheet ? Math.max(0, auditSheet.getLastRow() - 1) : 0;
     return ContentService.createTextOutput(JSON.stringify({
-      status: "success",
-      message: "Bathuary GP Google Apps Script Webhook is Active & Connected!",
-      sheetName: sheet.getName(),
-      totalRows: sheet.getLastRow(),
-      timestamp: new Date().toISOString()
+      status: "CONNECTED",
+      sheetName: "BATHUARY ALL",
+      totalRows: ss.getSheetByName("BATHUARY ALL") ? ss.getSheetByName("BATHUARY ALL").getLastRow() : 0,
+      usersCount: totalUsers,
+      auditLogsCount: totalLogs,
+      message: "Bathuary GP Multi-Device Cloud Engine is Active!"
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+  
+  try {
+    return HtmlService.createTemplateFromFile('Index')
+      .evaluate()
+      .setTitle('Bathuary Gram Panchayat Job Card Portal')
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } catch(eHtml) {
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "CONNECTED",
+      sheetName: "BATHUARY ALL",
+      totalRows: ss.getSheetByName("BATHUARY ALL") ? ss.getSheetByName("BATHUARY ALL").getLastRow() : 0,
+      message: "Bathuary GP Multi-Device Cloud Engine is Active!"
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// ----------------------------------------------------------------------------
+// 1. Android App & Web Portal Live HTTP POST Handler
+// ----------------------------------------------------------------------------
+function doPost(e) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var data = {};
+    
+    if (e && e.postData && e.postData.contents) {
+      try {
+        data = JSON.parse(e.postData.contents);
+      } catch(err) {
+        data = e.parameter || {};
+      }
+    } else if (e && e.parameter) {
+      data = e.parameter;
+    }
+
+    var action = (data.action || "").toString().trim();
+
+    // Ping diagnostic check
+    if (action === "ping" || data.api === "ping") {
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "CONNECTED",
+        sheetName: "BATHUARY ALL",
+        message: "Bathuary GP Multi-Device Cloud Engine is Active!"
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // --- USER MANAGEMENT SYNC ---
+    if (action === "saveUser" || action === "createUser" || action === "updateUser") {
+      return handleSaveUser(ss, data);
+    }
+    if (action === "deleteUser") {
+      return handleDeleteUser(ss, data);
+    }
+    if (action === "getUsers" || action === "syncUsers") {
+      return handleGetUsers(ss);
+    }
+
+    // --- AUDIT LOGS SYNC ---
+    if (action === "getAuditLogs" || action === "syncAuditLogs") {
+      return handleGetAuditLogs(ss);
+    }
+    if (action === "clearAuditLogs" || action === "deleteAuditLogs") {
+      return handleClearAuditLogs(ss);
+    }
+
+    // --- BENEFICIARY READ SYNC (Code.gs Read) ---
+    if (action === "getData" || action === "readData" || action === "getBeneficiaries" || action === "readSheet") {
+      return handleGetBeneficiaries(ss, data);
+    }
+
+    var sheet = ss.getSheetByName("BATHUARY ALL") || ss.getActiveSheet();
+
+    // --- BENEFICIARY NEW ENTRY (addRow) ---
+    if (action === "addRow") {
+      var rowValues = [];
+      rowValues[0] = data.colA || String(sheet.getLastRow());
+      rowValues[1] = data.colB || "";
+      rowValues[2] = data.colC || "";
+      rowValues[3] = data.colD || "PURBA MEDINIPUR";
+      rowValues[4] = data.colE || "EGRA-I";
+      rowValues[5] = data.colF || "BATHUARY";
+      rowValues[6] = data.colG || "";
+      rowValues[7] = data.colH || data.jobCardNumber || "";
+      rowValues[8] = data.colI || data.applicantNo || "1";
+      rowValues[9] = data.colJ || data.applicantName || "";
+      rowValues[10] = data.colK || "";
+      rowValues[11] = data.colL || "";
+      rowValues[12] = data.colM || "";
+      rowValues[13] = data.colN || "";
+      rowValues[14] = data.colO || "";
+      rowValues[15] = (data.colP || data.aadhaarNumber) ? "'" + String(data.colP || data.aadhaarNumber).replace(/^'+/, "") : "";
+      rowValues[16] = (data.colQ || data.workerPhone) ? "'" + String(data.colQ || data.workerPhone).replace(/^'+/, "") : "";
+      rowValues[17] = data.colR || data.eKycDone || "No";
+      rowValues[18] = data.colS || data.eKycDate || "";
+      rowValues[19] = data.colT || data.eKycError || "";
+      rowValues[20] = data.colU || data.eKycDoneBy || "";
+      rowValues[21] = data.colV || data.villageName || "";
+      rowValues[22] = data.colW || data.jobCardSubmitted || "";
+      rowValues[23] = data.colX || data.remark || "";
+      rowValues[24] = data.colY || data.jobCardBookDelivered || "No";
+      for (var c = 25; c <= 39; c++) rowValues[c] = "";
+      rowValues[40] = data.colAO || data.bankName || "";
+      rowValues[41] = data.colAP || data.ifscCode || "";
+      rowValues[42] = data.colAQ || data.branchName || "";
+      rowValues[43] = (data.colAR || data.accountNumber) ? "'" + String(data.colAR || data.accountNumber).replace(/^'+/, "") : "";
+      sheet.appendRow(rowValues);
+      SpreadsheetApp.flush();
+      recordAuditLogAndIncrementCount(ss, data, data.colH || data.jobCardNumber);
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "SUCCESS",
+        action: "addRow",
+        row: sheet.getLastRow(),
+        jobCard: data.colH || data.jobCardNumber,
+        message: "নতুন উপভোক্তা গুগল স্প্রেডশীটে যুক্ত হয়েছে!"
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // --- BENEFICIARY LIVE UPDATE ---
+    var jobCard = (data.jobCardNumber || data.colH || "").toString().trim().toUpperCase();
+    var appNo = (data.applicantNo || data.colI || "1").toString().trim();
+    var rowIndex = parseInt(data.rowIndex || "-1");
+    
+    var values = sheet.getDataRange().getValues();
+    var targetRow = -1;
+    
+    if (rowIndex > 1 && rowIndex <= values.length) {
+      var rowJc = (values[rowIndex - 1][7] || "").toString().trim().toUpperCase();
+      if (!jobCard || rowJc === jobCard) {
+        targetRow = rowIndex;
+      }
+    }
+    
+    if (targetRow === -1 && jobCard) {
+      for (var i = 1; i < values.length; i++) {
+        var rJc = (values[i][7] || "").toString().trim().toUpperCase();
+        var rApp = (values[i][8] || "1").toString().trim();
+        if (rJc === jobCard && (rApp === appNo || appNo === "1" || appNo === "")) {
+          targetRow = i + 1;
+          break;
+        }
+      }
+    }
+    
+    if (targetRow === -1 && jobCard) {
+      for (var i = 1; i < values.length; i++) {
+        for (var j = 0; j < values[i].length; j++) {
+          if ((values[i][j] || "").toString().trim().toUpperCase() === jobCard) {
+            targetRow = i + 1;
+            break;
+          }
+        }
+        if (targetRow !== -1) break;
+      }
+    }
+    
+    if (targetRow !== -1) {
+      var changedFields = data.changedFields || null;
+      var hasFieldFilter = Array.isArray(changedFields) && changedFields.length > 0;
+
+      function shouldUpdate(fieldKey, colKey) {
+        if (hasFieldFilter) {
+          return changedFields.indexOf(fieldKey) !== -1 || changedFields.indexOf(colKey) !== -1;
+        }
+        return (data[fieldKey] !== undefined && data[fieldKey] !== null && data[fieldKey] !== "") ||
+               (data[colKey] !== undefined && data[colKey] !== null && data[colKey] !== "");
+      }
+
+      // Dynamic Header Column Resolution (AI Column Locator)
+      var headerRow = values[0] || [];
+      var colIndexMap = {};
+      for (var c = 0; c < headerRow.length; c++) {
+        var h = (headerRow[c] || "").toString().toLowerCase().trim();
+        if (!h) continue;
+        var col1 = c + 1;
+        if (h.indexOf("book") !== -1 || h.indexOf("deliver") !== -1 || h.indexOf("deliv") !== -1 || h.indexOf("বই") !== -1 || h.indexOf("বিতরণ") !== -1 || h.indexOf("বিলি") !== -1) {
+          colIndexMap["colY"] = col1;
+        } else if (h.indexOf("submitted") !== -1 || h.indexOf("submission") !== -1 || h.indexOf("জমা") !== -1) {
+          colIndexMap["colW"] = col1;
+        } else if (h.indexOf("aadhaar") !== -1 || h.indexOf("uid") !== -1) {
+          colIndexMap["colP"] = col1;
+        } else if (h.indexOf("phone") !== -1 || h.indexOf("mobile") !== -1 || h.indexOf("contact") !== -1) {
+          colIndexMap["colQ"] = col1;
+        } else if (h.indexOf("kyc") !== -1 && (h.indexOf("date") !== -1 || h.indexOf("dt") !== -1)) {
+          colIndexMap["colS"] = col1;
+        } else if (h.indexOf("kyc") !== -1 || h.indexOf("e-kyc") !== -1) {
+          colIndexMap["colR"] = col1;
+        } else if (h.indexOf("error") !== -1 || h.indexOf("reason") !== -1) {
+          colIndexMap["colT"] = col1;
+        } else if (h.indexOf("done by") !== -1 || h.indexOf("officer") !== -1 || h.indexOf("vle") !== -1 || h.indexOf("grs") !== -1) {
+          colIndexMap["colU"] = col1;
+        } else if (h.indexOf("village") !== -1 || h.indexOf("gram") !== -1 || h.indexOf("mouza") !== -1) {
+          colIndexMap["colV"] = col1;
+        } else if (h === "remark" || h.indexOf("remarks") !== -1) {
+          colIndexMap["colX"] = col1;
+        } else if (h.indexOf("bank") !== -1 && h.indexOf("branch") === -1 && h.indexOf("ifsc") === -1 && h.indexOf("account") === -1) {
+          colIndexMap["colAO"] = col1;
+        } else if (h.indexOf("ifsc") !== -1) {
+          colIndexMap["colAP"] = col1;
+        } else if (h.indexOf("branch") !== -1) {
+          colIndexMap["colAQ"] = col1;
+        } else if (h.indexOf("account") !== -1 || h.indexOf("a/c") !== -1 || h.indexOf("acc no") !== -1) {
+          colIndexMap["colAR"] = col1;
+        }
+      }
+
+      function setPlainTextCell(row, col, value) {
+        try {
+          var cleanVal = (value === null || value === undefined) ? "" : value.toString().replace(/^'+/, "").trim();
+          var cell = sheet.getRange(row, col);
+          try { cell.clearDataValidations(); } catch(e0) {}
+          cell.setNumberFormat('@');
+          cell.setValue(cleanVal);
+        } catch(e) {}
+      }
+
+      function setStandardCell(row, col, value) {
+        try {
+          var cleanVal = (value === null || value === undefined) ? "" : value.toString().trim();
+          var cell = sheet.getRange(row, col);
+          try { cell.clearDataValidations(); } catch(e0) {}
+          cell.setValue(cleanVal);
+        } catch(e) {}
+      }
+
+      // 1. Col P: Aadhaar Number
+      if (shouldUpdate("aadhaarNumber", "colP")) {
+        var rawP = data.colP !== undefined ? data.colP : data.aadhaarNumber;
+        setPlainTextCell(targetRow, colIndexMap["colP"] || 16, rawP);
+      }
+      
+      // 2. Col Q: Worker Phone Number
+      if (shouldUpdate("workerPhone", "colQ")) {
+        var rawQ = data.colQ !== undefined ? data.colQ : data.workerPhone;
+        setPlainTextCell(targetRow, colIndexMap["colQ"] || 17, rawQ);
+      }
+      
+      // 3. Col R: E-KYC Successfully Done
+      if (shouldUpdate("eKycDone", "colR")) {
+        var rawR = (data.colR !== undefined ? data.colR : (data.eKycDone || "")).toString().trim();
+        var colR = (rawR.toUpperCase() === "Y" || rawR.toUpperCase() === "YES" || rawR === "হ্যাঁ" || rawR.toUpperCase() === "DONE") ? "Yes" : (rawR.toUpperCase() === "N" || rawR.toUpperCase() === "NO" || rawR === "না" || rawR.toUpperCase() === "PENDING") ? "No" : rawR;
+        setStandardCell(targetRow, colIndexMap["colR"] || 18, colR);
+      }
+      
+      // 4. Col S: Date of e-KYC
+      if (shouldUpdate("eKycDate", "colS")) {
+        var colS = (data.colS !== undefined ? data.colS : (data.eKycDate || "")).toString().trim();
+        setStandardCell(targetRow, colIndexMap["colS"] || 19, colS);
+      }
+      
+      // 5. Col T: Error code / Reason
+      if (shouldUpdate("eKycError", "colT")) {
+        var colT = (data.colT !== undefined ? data.colT : (data.eKycError || "")).toString().trim();
+        setStandardCell(targetRow, colIndexMap["colT"] || 20, colT);
+      }
+      
+      // 6. Col U: E-KYC Done By
+      if (shouldUpdate("eKycDoneBy", "colU")) {
+        var colU = (data.colU !== undefined ? data.colU : (data.eKycDoneBy || "")).toString().trim();
+        setStandardCell(targetRow, colIndexMap["colU"] || 21, colU);
+      }
+      
+      // 7. Col V: Village Name
+      if (shouldUpdate("villageName", "colV")) {
+        var colV = (data.colV !== undefined ? data.colV : (data.villageName || "")).toString().trim();
+        setStandardCell(targetRow, colIndexMap["colV"] || 22, colV);
+      }
+      
+      // 8. Col W: Job Card Submitted
+      if (shouldUpdate("jobCardSubmitted", "colW")) {
+        var rawW = (data.colW !== undefined ? data.colW : (data.jobCardSubmitted || "")).toString().trim();
+        var lW = rawW.toLowerCase();
+        var colW = (lW === "no" || lW === "n" || lW === "0" || lW === "false" || lW.indexOf("না") !== -1 || lW.indexOf("বাকি") !== -1) ? "No" : "Yes";
+        setStandardCell(targetRow, colIndexMap["colW"] || 23, colW);
+      }
+      
+      // 9. Col X: Remark
+      if (shouldUpdate("remark", "colX")) {
+        var colX = (data.colX !== undefined ? data.colX : (data.remark || "")).toString().trim();
+        setStandardCell(targetRow, colIndexMap["colX"] || 24, colX);
+      }
+      
+      // 10. Col Y: Job Card Book Delivered (AI Normalization)
+      if (shouldUpdate("jobCardBookDelivered", "colY")) {
+        var rawY = (data.colY !== undefined ? data.colY : (data.jobCardBookDelivered || "")).toString().trim();
+        var lY = rawY.toLowerCase();
+        var isDelivered = (lY === "yes" || lY === "y" || lY === "1" || lY === "true" || lY.indexOf("deliver") !== -1 || lY.indexOf("deliv") !== -1 || lY.indexOf("done") !== -1 || lY.indexOf("completed") !== -1 || lY.indexOf("হ্যাঁ") !== -1 || lY.indexOf("দেওয়া") !== -1 || lY.indexOf("দেওয়া") !== -1 || lY.indexOf("বিলি") !== -1 || lY.indexOf("বিতরণ") !== -1);
+        var colY = isDelivered ? "Yes" : "No";
+        setStandardCell(targetRow, colIndexMap["colY"] || 25, colY);
+      }
+      
+      // 11. Col AO: Bank Name
+      if (shouldUpdate("bankName", "colAO")) {
+        var colAO = (data.colAO !== undefined ? data.colAO : (data.bankName || "")).toString().trim();
+        setStandardCell(targetRow, colIndexMap["colAO"] || 41, colAO);
+      }
+      
+      // 12. Col AP: IFSC Code
+      if (shouldUpdate("ifscCode", "colAP")) {
+        var colAP = (data.colAP !== undefined ? data.colAP : (data.ifscCode || "")).toString().toUpperCase().trim();
+        setStandardCell(targetRow, colIndexMap["colAP"] || 42, colAP);
+      }
+      
+      // 13. Col AQ: Branch Name
+      if (shouldUpdate("branchName", "colAQ")) {
+        var colAQ = (data.colAQ !== undefined ? data.colAQ : (data.branchName || "")).toString().trim();
+        setStandardCell(targetRow, colIndexMap["colAQ"] || 43, colAQ);
+      }
+      
+      // 14. Col AR: Account Number
+      if (shouldUpdate("accountNumber", "colAR")) {
+        var rawAR = data.colAR !== undefined ? data.colAR : data.accountNumber;
+        setPlainTextCell(targetRow, colIndexMap["colAR"] || 44, rawAR);
+      }
+      
+      recordAuditLogAndIncrementCount(ss, data, jobCard);
+      SpreadsheetApp.flush();
+      
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "SUCCESS",
+        row: targetRow,
+        sheet: sheet.getName(),
+        jobCard: jobCard,
+        message: "Google Sheet successfully updated!"
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "NOT_FOUND",
+      jobCard: jobCard,
+      message: "Job Card row not found in sheet BATHUARY ALL"
     })).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({
-      status: "error",
+      status: "ERROR",
       message: err.toString()
     })).setMimeType(ContentService.MimeType.JSON);
   }
 }
 
-function doPost(e) {
+function getIndianTimestamp(dateObj) {
+  var d = dateObj || new Date();
   try {
-    if (!e || !e.postData || !e.postData.contents) {
-      return ContentService.createTextOutput(JSON.stringify({ status: "error", message: "No data payload received" }))
-        .setMimeType(ContentService.MimeType.JSON);
+    return Utilities.formatDate(d, "Asia/Kolkata", "dd/MM/yyyy hh:mm:ss a");
+  } catch(e) {
+    return d.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
+  }
+}
+
+function getOrCreateUsersSheet(ss) {
+  var sheet = ss.getSheetByName("USERS");
+  if (!sheet) {
+    sheet = ss.insertSheet("USERS");
+    var headers = ["Mobile", "Name", "Role", "Designation", "Password", "Gender", "FatherName", "HusbandName", "Email", "SupervisorId", "AssignedVillages", "TotalUpdates", "UpdatedAt"];
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.getRange(1, 1, 1, headers.length).setFontWeight("bold").setBackground("#E8F5E9");
+    SpreadsheetApp.flush();
+  }
+  return sheet;
+}
+
+function handleSaveUser(ss, data) {
+  var sheet = getOrCreateUsersSheet(ss);
+  var mobile = (data.mobile || data.mobileNumber || "").toString().trim();
+  if (!mobile) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "ERROR", message: "Mobile number is required" })).setMimeType(ContentService.MimeType.JSON);
+  }
+  var values = sheet.getDataRange().getValues();
+  var targetRow = -1;
+  for (var i = 1; i < values.length; i++) {
+    if ((values[i][0] || "").toString().trim() === mobile) {
+      targetRow = i + 1;
+      break;
     }
-    var data = JSON.parse(e.postData.contents);
-    var sheet = getTargetSheet();
+  }
+  var istTime = (data.updatedAtIST || data.updatedAtFormatted || getIndianTimestamp(new Date())).toString().trim();
+  var rowData = [
+    mobile,
+    (data.name || "").toString().trim(),
+    (data.role || "OFFICER").toString().trim(),
+    (data.designation || "GRS").toString().trim(),
+    (data.password || "User@1234").toString().trim(),
+    (data.gender || "Male").toString().trim(),
+    (data.fatherName || "").toString().trim(),
+    (data.husbandName || "").toString().trim(),
+    (data.email || "").toString().trim(),
+    (data.supervisorId || "").toString().trim(),
+    (data.assignedVillage || data.assignedVillages || "").toString().trim(),
+    parseInt(data.totalUpdatesCount || 0) || 0,
+    istTime
+  ];
+  if (targetRow !== -1) {
+    sheet.getRange(targetRow, 1, 1, rowData.length).setValues([rowData]);
+  } else {
+    sheet.appendRow(rowData);
+  }
+  SpreadsheetApp.flush();
+  return ContentService.createTextOutput(JSON.stringify({
+    status: "SUCCESS",
+    action: "saveUser",
+    mobile: mobile,
+    message: "User saved & synced to Google Sheet USERS tab!"
+  })).setMimeType(ContentService.MimeType.JSON);
+}
 
-    // Ping / Diagnostic Action
-    if (data.action === "ping" || data.action === "test") {
-      return ContentService.createTextOutput(JSON.stringify({
-        status: "success",
-        message: "Webhook সংযোগ সফল! Google Sheet সরাসরি আপডেট করার জন্য প্রস্তুত।",
-        sheetName: sheet.getName(),
-        totalRows: sheet.getLastRow(),
-        timestamp: new Date().toISOString()
-      })).setMimeType(ContentService.MimeType.JSON);
-    }
-
-    // Add New Beneficiary Entry Action
-    if (data.action === "addRow") {
-      var rowValues = [];
-      rowValues[0] = data.colA || String(sheet.getLastRow()); // Col A SL
-      rowValues[1] = data.colB || ""; // Col B Sansad
-      rowValues[2] = data.colC || ""; // Col C
-      rowValues[3] = data.colD || "PURBA MEDINIPUR"; // Col D
-      rowValues[4] = data.colE || "EGRA-I"; // Col E
-      rowValues[5] = data.colF || "BATHUARY"; // Col F
-      rowValues[6] = data.colG || ""; // Col G
-      rowValues[7] = data.colH || ""; // Col H Job Card
-      rowValues[8] = data.colI || "1"; // Col I Applicant No
-      rowValues[9] = data.colJ || ""; // Col J Applicant Name
-      rowValues[10] = data.colK || ""; // Col K Gender
-      rowValues[11] = data.colL || ""; // Col L Age
-      rowValues[12] = data.colM || ""; // Col M Category
-      rowValues[13] = data.colN || ""; // Col N Head of House
-      rowValues[14] = data.colO || ""; // Col O Father/Husband
-      rowValues[15] = data.colP ? "'" + String(data.colP) : ""; // Col P Aadhaar
-      rowValues[16] = data.colQ ? "'" + String(data.colQ) : ""; // Col Q Mobile
-      rowValues[17] = data.colR || "NO"; // Col R e-KYC
-      rowValues[18] = data.colS || ""; // Col S Date
-      rowValues[19] = data.colT || ""; // Col T Remark/Reason
-      rowValues[20] = data.colU || ""; // Col U Processed By
-      rowValues[21] = data.colV || ""; // Col V Village
-      rowValues[22] = data.colW || ""; // Col W Delivered To
-      rowValues[23] = data.colX || ""; // Col X Delivery Date
-      rowValues[24] = data.colY || "NO"; // Col Y Book Delivered
-      for (var col = 25; col <= 39; col++) {
-        rowValues[col] = "";
-      }
-      rowValues[40] = data.colAO || ""; // Col AO Bank Name
-      rowValues[41] = data.colAP || ""; // Col AP IFSC
-      rowValues[42] = data.colAQ || ""; // Col AQ Branch
-      rowValues[43] = data.colAR ? "'" + String(data.colAR) : ""; // Col AR Account
-
-      sheet.appendRow(rowValues);
+function handleDeleteUser(ss, data) {
+  var sheet = getOrCreateUsersSheet(ss);
+  var mobile = (data.mobile || data.mobileNumber || "").toString().trim();
+  if (!mobile) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "ERROR", message: "Mobile number is required" })).setMimeType(ContentService.MimeType.JSON);
+  }
+  var values = sheet.getDataRange().getValues();
+  for (var i = 1; i < values.length; i++) {
+    if ((values[i][0] || "").toString().trim() === mobile) {
+      sheet.deleteRow(i + 1);
       SpreadsheetApp.flush();
       return ContentService.createTextOutput(JSON.stringify({
-        status: "success",
-        message: "নতুন উপভোক্তা গুগল স্প্রেডশীটে সফলভাবে যোগ করা হয়েছে!",
-        row: sheet.getLastRow(),
-        jobCard: data.colH
+        status: "SUCCESS",
+        action: "deleteUser",
+        mobile: mobile,
+        message: "User deleted from Google Sheet USERS tab!"
       })).setMimeType(ContentService.MimeType.JSON);
     }
+  }
+  return ContentService.createTextOutput(JSON.stringify({
+    status: "NOT_FOUND",
+    message: "User not found in USERS sheet"
+  })).setMimeType(ContentService.MimeType.JSON);
+}
 
-    // Update Row Action
-    var rowIndex = Number(data.rowIndex);
-    var jobCard = String(data.colH || "").trim();
-    var targetRow = rowIndex;
+function handleGetUsers(ss) {
+  var sheet = getOrCreateUsersSheet(ss);
+  var values = sheet.getDataRange().getValues();
+  var users = [];
+  for (var i = 1; i < values.length; i++) {
+    var row = values[i];
+    var mob = (row[0] || "").toString().trim();
+    if (mob) {
+      users.push({
+        mobileNumber: mob,
+        name: (row[1] || "").toString().trim(),
+        role: (row[2] || "OFFICER").toString().trim(),
+        designation: (row[3] || "GRS").toString().trim(),
+        gender: (row[5] || "Male").toString().trim(),
+        fatherName: (row[6] || "").toString().trim(),
+        husbandName: (row[7] || "").toString().trim(),
+        email: (row[8] || "").toString().trim(),
+        supervisorId: (row[9] || "").toString().trim(),
+        assignedVillage: (row[10] || "").toString().trim(),
+        totalUpdatesCount: parseInt(row[11] || 0) || 0
+      });
+    }
+  }
+  return ContentService.createTextOutput(JSON.stringify({
+    status: "SUCCESS",
+    count: users.length,
+    users: users
+  })).setMimeType(ContentService.MimeType.JSON);
+}
 
-    // Search row by Job Card Number (Col 8 = Col H)
-    if (jobCard) {
-      var dataRange = sheet.getDataRange().getValues();
-      for (var r = 1; r < dataRange.length; r++) {
-        if (String(dataRange[r][7] || "").trim() === jobCard) {
-          targetRow = r + 1;
+function handleGetBeneficiaries(ss, data) {
+  var sheet = ss.getSheetByName("BATHUARY ALL") || ss.getSheets()[0];
+  if (!sheet) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "ERROR", message: "BATHUARY ALL sheet not found" })).setMimeType(ContentService.MimeType.JSON);
+  }
+  
+  var values = sheet.getDataRange().getValues();
+  if (!values || values.length <= 1) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "SUCCESS", count: 0, beneficiaries: [] })).setMimeType(ContentService.MimeType.JSON);
+  }
+  
+  // AI Dynamic Header Resolution
+  var headerRow = values[0] || [];
+  var colMap = {};
+  for (var c = 0; c < headerRow.length; c++) {
+    var val = (headerRow[c] || "").toString().toLowerCase().trim();
+    if (!val) continue;
+    
+    // Priority 1: Col Y - Job Card Book Delivered
+    if (val.indexOf("book") !== -1 || val.indexOf("deliver") !== -1 || val.indexOf("deliv") !== -1 || val.indexOf("বই") !== -1 || val.indexOf("বিতরণ") !== -1 || val.indexOf("বিলি") !== -1) {
+      colMap["colY"] = c;
+    }
+    // Priority 2: Col W - Job Card Submitted to Office
+    else if (val.indexOf("submitted") !== -1 || val.indexOf("submission") !== -1 || val.indexOf("জমা") !== -1) {
+      colMap["colW"] = c;
+    }
+    // Priority 3: Col H - Job Card Number
+    else if (val === "job card number" || val === "job card no" || val === "job card" || val === "reg no" || ((val.indexOf("job") !== -1 || val.indexOf("কার্ড")) && (val.indexOf("card") !== -1 || val.indexOf("no") !== -1 || val.indexOf("num") !== -1 || val.indexOf("নম্বর") !== -1))) {
+      colMap["colH"] = c;
+    }
+    else if (val.indexOf("applicant") !== -1 && val.indexOf("name") !== -1) colMap["colJ"] = c;
+    else if (val === "name" || val.indexOf("beneficiary") !== -1 || val.indexOf("worker") !== -1) colMap["colJ"] = c;
+    else if (val.indexOf("sansad") !== -1 || val.indexOf("ward") !== -1) colMap["colB"] = c;
+    else if (val.indexOf("village") !== -1 || val.indexOf("gram") !== -1 || val.indexOf("mouza") !== -1) colMap["colV"] = c;
+    else if (val.indexOf("aadhaar") !== -1 || val.indexOf("uid") !== -1) colMap["colP"] = c;
+    else if (val.indexOf("mobile") !== -1 || val.indexOf("phone") !== -1 || val.indexOf("contact") !== -1) colMap["colQ"] = c;
+    else if (val.indexOf("kyc") !== -1 && (val.indexOf("date") !== -1 || val.indexOf("dt") !== -1)) colMap["colS"] = c;
+    else if (val.indexOf("kyc") !== -1 || val.indexOf("e-kyc") !== -1) colMap["colR"] = c;
+    else if (val.indexOf("abps") !== -1) colMap["colO"] = c;
+    else if (val.indexOf("bank") !== -1 && val.indexOf("branch") === -1 && val.indexOf("ifsc") === -1 && val.indexOf("account") === -1) colMap["colAO"] = c;
+    else if (val.indexOf("ifsc") !== -1) colMap["colAP"] = c;
+    else if (val.indexOf("branch") !== -1) colMap["colAQ"] = c;
+    else if (val.indexOf("account") !== -1 || val.indexOf("a/c") !== -1 || val.indexOf("acc no") !== -1) colMap["colAR"] = c;
+    else if (val.indexOf("remark") !== -1 || val.indexOf("error") !== -1 || val.indexOf("reason") !== -1) colMap["colT"] = c;
+    else if (val.indexOf("vle") !== -1 || val.indexOf("officer") !== -1 || val.indexOf("grs") !== -1 || val.indexOf("done by") !== -1) colMap["colU"] = c;
+  }
+
+  function getVal(row, key, defaultIdx) {
+    var idx = colMap[key] !== undefined ? colMap[key] : defaultIdx;
+    return (row[idx] !== undefined && row[idx] !== null) ? row[idx].toString().trim() : "";
+  }
+
+  function normalizeDelivery(raw) {
+    if (!raw) return "No";
+    var l = raw.toLowerCase().trim();
+    if (l === "yes" || l === "y" || l === "1" || l === "true" || l.indexOf("deliver") !== -1 || l.indexOf("deliv") !== -1 || l.indexOf("done") !== -1 || l.indexOf("completed") !== -1 || l.indexOf("হ্যাঁ") !== -1 || l.indexOf("দেওয়া") !== -1 || l.indexOf("দেওয়া") !== -1 || l.indexOf("বিলি") !== -1 || l.indexOf("বিতরণ") !== -1) {
+      return "Yes";
+    }
+    return "No";
+  }
+
+  function normalizeSubmitted(raw) {
+    if (!raw) return "Yes";
+    var l = raw.toLowerCase().trim();
+    if (l === "no" || l === "n" || l === "0" || l === "false" || l.indexOf("না") !== -1 || l.indexOf("বাকি") !== -1) {
+      return "No";
+    }
+    return "Yes";
+  }
+
+  var filterJc = (data && (data.jobCardNumber || data.jobCard || data.colH)) ? data.jobCardNumber || data.jobCard || data.colH : "";
+  if (filterJc) filterJc = filterJc.toString().trim().toUpperCase();
+
+  var list = [];
+  for (var i = 1; i < values.length; i++) {
+    var row = values[i];
+    var jc = getVal(row, "colH", 7);
+    var name = getVal(row, "colJ", 9);
+    if (!jc && !name) continue;
+
+    if (filterJc && jc.toUpperCase() !== filterJc) continue;
+
+    var rawY = getVal(row, "colY", 24);
+    var rawW = getVal(row, "colW", 22);
+    var rawR = getVal(row, "colR", 17);
+    var isKycDone = (rawR.toUpperCase() === "YES" || rawR.toUpperCase() === "Y" || rawR.toUpperCase() === "DONE" || rawR.toUpperCase() === "1" || rawR === "হ্যাঁ");
+    var rawO = getVal(row, "colO", 14);
+    var isAbps = (rawO.toUpperCase() === "YES" || rawO.toUpperCase() === "Y" || rawO.toUpperCase() === "1");
+
+    list.push({
+      rowIndex: i + 1,
+      colA: getVal(row, "colA", 0) || String(i),
+      colB: getVal(row, "colB", 1) || "BATHUARY 1",
+      colC: getVal(row, "colC", 2) || String(i),
+      colD: getVal(row, "colD", 3) || "PURBA MEDINIPUR",
+      colE: getVal(row, "colE", 4) || "EGRA - II",
+      colF: getVal(row, "colF", 5) || "BATHUARY",
+      colG: getVal(row, "colG", 6) || "",
+      colH: jc,
+      colI: getVal(row, "colI", 8) || "1",
+      colJ: name,
+      colK: getVal(row, "colK", 10) || "M",
+      colL: getVal(row, "colL", 11),
+      colM: getVal(row, "colM", 12) || "Yes",
+      colN: getVal(row, "colN", 13) || "Yes",
+      colO: isAbps ? "Yes" : "No",
+      colP: getVal(row, "colP", 15).replace(/\D/g, ""),
+      colQ: getVal(row, "colQ", 16).replace(/\D/g, ""),
+      colR: isKycDone ? "Yes" : "No",
+      colS: getVal(row, "colS", 18),
+      colT: getVal(row, "colT", 19),
+      colU: getVal(row, "colU", 20) || "MANIK DAS, GRS",
+      colV: getVal(row, "colV", 21) || "GAGNA",
+      colW: normalizeSubmitted(rawW),
+      colX: getVal(row, "colX", 23),
+      colY: normalizeDelivery(rawY),
+      colAO: getVal(row, "colAO", 40) || "BANK OF INDIA",
+      colAP: getVal(row, "colAP", 41) || "BKID0004316",
+      colAQ: getVal(row, "colAQ", 42) || "BATHUARY",
+      colAR: getVal(row, "colAR", 43)
+    });
+  }
+
+  return ContentService.createTextOutput(JSON.stringify({
+    status: "SUCCESS",
+    count: list.length,
+    beneficiaries: list
+  })).setMimeType(ContentService.MimeType.JSON);
+}
+
+function getOrCreateAuditLogsSheet(ss) {
+  var sheet = ss.getSheetByName("AUDIT_LOGS");
+  var headers = ["Timestamp", "JobCard", "ApplicantName", "UserMobile", "UserName", "UserRole", "UserTotalUpdates", "ChangesSummary", "EpochMillis"];
+  if (!sheet) {
+    sheet = ss.insertSheet("AUDIT_LOGS");
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.getRange(1, 1, 1, headers.length).setFontWeight("bold").setBackground("#E0F2FE");
+    SpreadsheetApp.flush();
+  }
+  return sheet;
+}
+
+function handleGetAuditLogs(ss) {
+  var sheet = getOrCreateAuditLogsSheet(ss);
+  var values = sheet.getDataRange().getValues();
+  var logs = [];
+  for (var i = values.length - 1; i >= 1; i--) {
+    var row = values[i];
+    var jc = (row[1] || "").toString().trim();
+    var mob = (row[3] || "").toString().trim();
+    if (jc || mob) {
+      logs.push({
+        jobCard: jc,
+        applicantName: (row[2] || "").toString().trim(),
+        userMobile: mob,
+        userName: (row[4] || "").toString().trim(),
+        userRole: (row[5] || "OFFICER").toString().trim(),
+        userTotalUpdates: parseInt(row[6] || 0) || 0,
+        changesSummary: (row[7] || "").toString().trim(),
+        epochMillis: parseInt(row[8] || 0) || Date.now()
+      });
+    }
+  }
+  return ContentService.createTextOutput(JSON.stringify({
+    status: "SUCCESS",
+    count: logs.length,
+    logs: logs
+  })).setMimeType(ContentService.MimeType.JSON);
+}
+
+function handleClearAuditLogs(ss) {
+  var sheet = ss.getSheetByName("AUDIT_LOGS");
+  var deletedCount = 0;
+  if (sheet) {
+    var lastRow = sheet.getLastRow();
+    if (lastRow > 1) {
+      deletedCount = lastRow - 1;
+      sheet.deleteRows(2, lastRow - 1);
+    }
+  }
+  SpreadsheetApp.flush();
+  return ContentService.createTextOutput(JSON.stringify({
+    status: "SUCCESS",
+    action: "clearAuditLogs",
+    clearedCount: deletedCount,
+    message: "AUDIT_LOGS cleared successfully!"
+  })).setMimeType(ContentService.MimeType.JSON);
+}
+
+function recordAuditLogAndIncrementCount(ss, data, jobCard) {
+  var userMobile = (data.userId || data.updaterMobile || "").toString().trim();
+  if (!userMobile && !jobCard) return;
+
+  var now = new Date();
+  var epoch = now.getTime();
+  var istFormattedTime = (data.updatedAtIST || data.updatedAtFormatted || getIndianTimestamp(now)).toString().trim();
+  var applicantName = (data.applicantName || "").toString().trim();
+  var userName = (data.userName || "").toString().trim();
+  var userRole = (data.userRole || "OFFICER").toString().trim();
+  var summary = (data.changesSummary || "Updated worker details").toString().trim();
+
+  var updatedCount = 1;
+  if (userMobile) {
+    try {
+      var userSheet = getOrCreateUsersSheet(ss);
+      var uValues = userSheet.getDataRange().getValues();
+      var userFound = false;
+      for (var i = 1; i < uValues.length; i++) {
+        if ((uValues[i][0] || "").toString().trim() === userMobile) {
+          var currentCount = parseInt(uValues[i][11] || 0) || 0;
+          updatedCount = currentCount + 1;
+          userSheet.getRange(i + 1, 12).setValue(updatedCount);
+          userSheet.getRange(i + 1, 13).setValue(istFormattedTime);
+          userFound = true;
           break;
         }
       }
-    }
-
-    if (!targetRow || targetRow < 2) {
-      return ContentService.createTextOutput(JSON.stringify({
-        status: "error",
-        message: "Row not found for Job Card: " + jobCard
-      })).setMimeType(ContentService.MimeType.JSON);
-    }
-
-    var u = data.updates || data;
-    // Col 16: P = Aadhaar
-    if (u.colP !== undefined) sheet.getRange(targetRow, 16).setValue(u.colP ? "'" + String(u.colP) : "");
-    // Col 17: Q = Mobile
-    if (u.colQ !== undefined) sheet.getRange(targetRow, 17).setValue(u.colQ ? "'" + String(u.colQ) : "");
-    // Col 18: R = e-KYC Status
-    if (u.colR !== undefined) sheet.getRange(targetRow, 18).setValue(String(u.colR));
-    // Col 19: S = e-KYC Date
-    if (u.colS !== undefined) sheet.getRange(targetRow, 19).setValue(String(u.colS));
-    // Col 20: T = Remark / Reason
-    if (u.colT !== undefined) sheet.getRange(targetRow, 20).setValue(String(u.colT));
-    // Col 21: U = VLE / Operator
-    if (u.colU !== undefined) sheet.getRange(targetRow, 21).setValue(String(u.colU));
-    // Col 22: V = Village
-    if (u.colV !== undefined) sheet.getRange(targetRow, 22).setValue(String(u.colV));
-    // Col 23: W = Delivered To
-    if (u.colW !== undefined) sheet.getRange(targetRow, 23).setValue(String(u.colW));
-    // Col 24: X = Delivery Date
-    if (u.colX !== undefined) sheet.getRange(targetRow, 24).setValue(String(u.colX));
-    // Col 25: Y = Job Card Book Delivered
-    if (u.colY !== undefined) sheet.getRange(targetRow, 25).setValue(String(u.colY));
-    // Col 41: AO = Bank Name
-    if (u.colAO !== undefined) sheet.getRange(targetRow, 41).setValue(String(u.colAO));
-    // Col 42: AP = IFSC Code
-    if (u.colAP !== undefined) sheet.getRange(targetRow, 42).setValue(String(u.colAP));
-    // Col 43: AQ = Branch Name
-    if (u.colAQ !== undefined) sheet.getRange(targetRow, 43).setValue(String(u.colAQ));
-    // Col 44: AR = Bank Account No
-    if (u.colAR !== undefined) sheet.getRange(targetRow, 44).setValue(u.colAR ? "'" + String(u.colAR) : "");
-
-    SpreadsheetApp.flush();
-    return ContentService.createTextOutput(JSON.stringify({
-      status: "success",
-      message: "Row " + targetRow + " updated successfully in Google Sheet",
-      row: targetRow,
-      jobCard: jobCard
-    })).setMimeType(ContentService.MimeType.JSON);
-  } catch (err) {
-    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() }))
-      .setMimeType(ContentService.MimeType.JSON);
+      if (!userFound && userMobile) {
+        userSheet.appendRow([userMobile, userName, userRole, "GRS", "User@1234", "Male", "", "", "", "", "", 1, istFormattedTime]);
+      }
+    } catch(e) {}
   }
+
+  try {
+    var logSheet = getOrCreateAuditLogsSheet(ss);
+    logSheet.appendRow([istFormattedTime, jobCard, applicantName, userMobile, userName, userRole, updatedCount, summary, epoch]);
+  } catch(e) {}
 }`;
                     navigator.clipboard.writeText(scriptCode);
                     setHasCopiedScript(true);

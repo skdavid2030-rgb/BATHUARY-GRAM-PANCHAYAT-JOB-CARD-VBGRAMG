@@ -84,7 +84,7 @@ export const DataUpdateForm: React.FC<DataUpdateFormProps> = ({
     colV: '', // Village
     colW: '', // Submitted to office
     colX: '', // Remarks
-    colY: '', // Job Card Book Delivered (Yes/No)
+    colY: 'No', // Job Card Book Delivered (Yes/No)
     colAO: '', // Bank Name
     colAP: '', // IFSC
     colAQ: '', // Branch
@@ -338,7 +338,7 @@ export const DataUpdateForm: React.FC<DataUpdateFormProps> = ({
       colV: match.colV || '',
       colW: match.colW || '',
       colX: match.colX || '',
-      colY: match.colY || '',
+      colY: (match.colY === 'Yes' || match.colY === 'Y' || match.colY === 'হ্যাঁ') ? 'Yes' : 'No',
       colAO: resolvedBank,
       colAP: resolvedIfsc,
       colAQ: resolvedBranch,
@@ -1231,13 +1231,12 @@ export const DataUpdateForm: React.FC<DataUpdateFormProps> = ({
                   Job Card Book Delivered? (Yes/No) (Col Y):
                 </label>
                 <select
-                  value={formData.colY}
+                  value={formData.colY === 'Yes' ? 'Yes' : 'No'}
                   onChange={(e) => setFormData({ ...formData, colY: e.target.value })}
                   className="w-full bg-slate-50 text-slate-800 text-xs sm:text-sm font-semibold rounded-xl px-3.5 py-2.5 border border-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 focus:outline-none transition-all cursor-pointer"
                 >
-                  <option value="">-- Select --</option>
-                  <option value="Yes">Yes</option>
-                  <option value="No">No</option>
+                  <option value="Yes">Yes (বই বিলি সম্পন্ন / Delivered)</option>
+                  <option value="No">No (বই বিলি বাকি / Not Delivered)</option>
                 </select>
               </div>
             </div>
@@ -1464,7 +1463,7 @@ export const DataUpdateForm: React.FC<DataUpdateFormProps> = ({
                     colV: activeRow.colV || '',
                     colW: activeRow.colW || '',
                     colX: activeRow.colX || '',
-                    colY: activeRow.colY || '',
+                    colY: (activeRow.colY === 'Yes' || activeRow.colY === 'Y' || activeRow.colY === 'হ্যাঁ') ? 'Yes' : 'No',
                     colAO: activeRow.colAO || '',
                     colAP: activeRow.colAP || '',
                     colAQ: activeRow.colAQ || '',

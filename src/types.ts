@@ -50,7 +50,7 @@ export interface AppUser {
   phone?: string;
   name: string;
   fullName?: string;
-  role: 'ADMIN' | 'OFFICER' | 'VLE' | 'GRS' | 'SAHAYAK' | 'SECRETARY';
+  role: 'ADMIN' | 'OFFICER' | 'VLE' | 'GRS' | 'SAHAYAK' | 'SECRETARY' | 'SUPERVISOR';
   designation?: string;
   password?: string;
   gender?: string;

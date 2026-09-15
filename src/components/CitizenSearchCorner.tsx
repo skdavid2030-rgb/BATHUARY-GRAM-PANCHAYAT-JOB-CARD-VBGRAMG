@@ -190,7 +190,9 @@ export const CitizenSearchCorner: React.FC<CitizenSearchCornerProps> = ({
                       </div>
                       <div>
                         <span className="text-[10px] font-bold text-slate-400 block">Book Delivered (Col Y):</span>
-                        <span className={`font-black truncate block ${row.colY === 'Yes' ? 'text-emerald-700' : 'text-slate-600'}`}>{row.colY || "—"}</span>
+                        <span className={`font-black truncate block ${row.colY === 'Yes' || row.colY === 'Y' || row.colY === 'হ্যাঁ' ? 'text-emerald-700' : 'text-slate-600'}`}>
+                          {row.colY === 'Yes' || row.colY === 'Y' || row.colY === 'হ্যাঁ' ? 'Yes' : 'No'}
+                        </span>
                       </div>
                       <div>
                         <span className="text-[10px] font-bold text-slate-400 block">ABPS Status:</span>

@@ -248,7 +248,7 @@ export const JobCardA5PrintModal: React.FC<JobCardA5PrintModalProps> = ({
                       ) : (
                         <span className="w-1.5 h-1.5 rounded-full bg-slate-400 inline-block shrink-0" />
                       )}
-                      <span className="whitespace-nowrap">{val || '—'}</span>
+                      <span className="whitespace-nowrap">{isYes ? 'Yes' : 'No'}</span>
                     </span>
                   );
                 })()}

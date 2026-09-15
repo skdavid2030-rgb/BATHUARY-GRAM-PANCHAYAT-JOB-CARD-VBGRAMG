@@ -19,6 +19,7 @@ import { INITIAL_USERS } from './data/initialUsers';
 import { INITIAL_BANK_MASTER, SANSAD_LIST, VILLAGES_LIST } from './data/bankMaster';
 import { CANONICAL_29_VILLAGES, normalizeVillageName } from './utils/villageNormalizer';
 import { CANONICAL_16_SANSADS, normalizeSansadName, isHeaderOrJunkSansad, sortSansads, extractSansadNumber } from './utils/sansadNormalizer';
+import { normalizeJobCardBookDelivered } from './utils/jobCardDeliveryNormalizer';
 import { safeStorage } from './utils/safeStorage';
 import { NationalEmblemLogo, VbGramGActLogo } from './components/Emblems';
 import { FileSpreadsheet, AlertCircle, RefreshCw, CheckCircle2, ShieldCheck } from 'lucide-react';
@@ -157,7 +158,8 @@ export default function App() {
               return {
                 ...b,
                 colV: normVillage,
-                colB: normalizeSansadName(b.colB, normVillage) || 'SANSAD-I'
+                colB: normalizeSansadName(b.colB, normVillage) || 'SANSAD-I',
+                colY: normalizeJobCardBookDelivered(b.colY)
               };
             });
             setBeneficiaries(normalized);

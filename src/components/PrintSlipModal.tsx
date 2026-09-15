@@ -168,8 +168,16 @@ export const PrintSlipModal: React.FC<PrintSlipModalProps> = ({
                 <td className="py-1.5 text-slate-800">{row.colU || "SK DAVID, VLE"}</td>
               </tr>
               <tr className="border-b border-slate-200">
+                <td className="py-1.5 font-bold text-slate-600">Job Card Submitted:</td>
+                <td className="py-1.5 text-slate-800 font-bold">
+                  {row.colW === 'No' || row.colW === 'না' ? 'No' : 'Yes'}
+                </td>
+              </tr>
+              <tr className="border-b border-slate-200">
                 <td className="py-1.5 font-bold text-slate-600">Job Card Book Delivered:</td>
-                <td className="py-1.5 text-slate-800 font-bold">{row.colY || "—"}</td>
+                <td className="py-1.5 text-slate-800 font-bold">
+                  {row.colY === 'Yes' || row.colY === 'Y' || row.colY === 'হ্যাঁ' ? 'Yes' : 'No'}
+                </td>
               </tr>
               <tr className="border-b border-slate-200">
                 <td className="py-1.5 font-bold text-slate-600">Remarks:</td>
