@@ -14,6 +14,7 @@ import { normalizeVillageName, CANONICAL_29_VILLAGES } from "./src/utils/village
 import { normalizeSansadName, CANONICAL_16_SANSADS, isHeaderOrJunkSansad, sortSansads } from "./src/utils/sansadNormalizer";
 import { formatKycDate } from "./src/utils/dateFormatter";
 import { normalizeJobCardBookDelivered, normalizeJobCardSubmitted } from "./src/utils/jobCardDeliveryNormalizer";
+import { fileURLToPath } from "url";
 
 dotenv.config();
 
@@ -24,12 +25,23 @@ const PORT = 3000;
 export const PERMANENT_DEFAULT_SHEET_URL = "https://docs.google.com/spreadsheets/d/1fCKKSgYo6LphZs39JURZIDZtAYBiH9JPgjOyS3Xu-PU/edit?usp=sharing";
 export const PERMANENT_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyikTK1-U5gkscBrHMXsNjwkEgeyYxMtq5za-X_Rey6WdZ7B7i93nevx9lK3x7SB5t4bA/exec";
 
+// Derive current directory safely across both ESM (tsx) and CJS (bundle)
+let currentDir = process.cwd();
+try {
+  currentDir = path.dirname(fileURLToPath(import.meta.url));
+} catch {
+  // In CommonJS environments, fallback to cwd or __dirname if present
+  if (typeof __dirname !== "undefined") {
+    currentDir = __dirname;
+  }
+}
+
 // Resilient file path finder supporting root, dist, and container environments
 function findExistingFilePath(filename: string): string {
   const candidates = [
     path.join(process.cwd(), filename),
-    path.join(__dirname, filename),
-    path.join(__dirname, "..", filename),
+    path.join(currentDir, filename),
+    path.join(currentDir, "..", filename),
     path.join(process.cwd(), "dist", filename)
   ];
   for (const c of candidates) {
