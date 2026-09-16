@@ -19,7 +19,9 @@ import {
   ExternalLink,
   X,
   Download,
-  Printer
+  Printer,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { AnalyticsData, VillageStat, BeneficiaryRow, ReportCategoryFilter } from '../types';
 
@@ -49,6 +51,7 @@ export const DashboardAnalytics: React.FC<DashboardProps> = ({
   const [sortBy, setSortBy] = useState<'total' | 'progress' | 'name'>('total');
   const [showUniqueCardsModal, setShowUniqueCardsModal] = useState(false);
   const [modalSearch, setModalSearch] = useState('');
+  const [modalShowFullAadhaar, setModalShowFullAadhaar] = useState(true);
 
   // Deduplicate unique job cards
   const uniqueJobCardList = useMemo(() => {
@@ -73,7 +76,9 @@ export const DashboardAnalytics: React.FC<DashboardProps> = ({
       (r.colAG && r.colAG.toLowerCase().includes(q)) ||
       (r.colAF && r.colAF.toLowerCase().includes(q)) ||
       (r.colV && r.colV.toLowerCase().includes(q)) ||
-      (r.colB && r.colB.toLowerCase().includes(q))
+      (r.colB && r.colB.toLowerCase().includes(q)) ||
+      (r.colP && r.colP.toLowerCase().includes(q)) ||
+      (r.colJ && r.colJ.toLowerCase().includes(q))
     );
   }, [uniqueJobCardList, modalSearch]);
 
@@ -561,12 +566,32 @@ export const DashboardAnalytics: React.FC<DashboardProps> = ({
                   className="w-full bg-white text-slate-900 text-xs sm:text-sm font-bold rounded-xl pl-9 pr-3 py-2 border-2 border-slate-200 focus:border-purple-500 focus:outline-none transition-all"
                 />
               </div>
-              <div className="flex items-center gap-2 text-xs font-black text-purple-900 bg-purple-100 px-3 py-1.5 rounded-xl border border-purple-200">
-                <span>Displaying {filteredModalCards.length} unique cards</span>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setModalShowFullAadhaar(!modalShowFullAadhaar)}
+                  className="px-3 py-1.5 text-xs font-bold rounded-xl border border-purple-300 bg-white hover:bg-purple-50 text-purple-900 flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                  title="Toggle Full 12-digit Aadhaar / Masked"
+                >
+                  {modalShowFullAadhaar ? (
+                    <>
+                      <EyeOff className="w-3.5 h-3.5 text-purple-700" />
+                      <span>Mask Aadhaar</span>
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="w-3.5 h-3.5 text-purple-700" />
+                      <span>Show Full (12 Digits)</span>
+                    </>
+                  )}
+                </button>
+                <div className="flex items-center gap-2 text-xs font-black text-purple-900 bg-purple-100 px-3 py-1.5 rounded-xl border border-purple-200">
+                  <span>Displaying {filteredModalCards.length} unique cards</span>
+                </div>
               </div>
             </div>
 
-            {/* Table with the 6 requested fields: Sl No, Sansad Name & No, Job Card Number, Head Of House Hold, Father's/Husband's Name of HH, Village Name */}
+            {/* Table with the requested fields including Aadhaar */}
             <div className="overflow-auto flex-1 p-4">
               <table className="w-full text-left border-collapse text-xs">
                 <thead className="bg-slate-900 text-white sticky top-0 z-10 font-sans">
@@ -575,6 +600,7 @@ export const DashboardAnalytics: React.FC<DashboardProps> = ({
                     <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 w-28">Sansad Name & No</th>
                     <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 w-44">Job Card Number</th>
                     <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800">Head Of House Hold</th>
+                    <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 w-36">Aadhaar No</th>
                     <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800">Father's/Husband's Name of HH</th>
                     <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider w-36">Village Name</th>
                   </tr>
@@ -586,13 +612,26 @@ export const DashboardAnalytics: React.FC<DashboardProps> = ({
                       <td className="p-2.5 sm:p-3 font-bold text-slate-800">{row.colB || '—'}</td>
                       <td className="p-2.5 sm:p-3 font-mono font-black text-purple-700">{row.colH}</td>
                       <td className="p-2.5 sm:p-3 font-black text-slate-900">{row.colAG || '—'}</td>
+                      <td className="p-2.5 sm:p-3 font-mono font-bold text-slate-800 whitespace-nowrap">
+                        {row.colP ? (
+                          modalShowFullAadhaar ? (
+                            row.colP.length === 12
+                              ? `${row.colP.slice(0, 4)} ${row.colP.slice(4, 8)} ${row.colP.slice(8, 12)}`
+                              : row.colP
+                          ) : (
+                            `•••• ${row.colP.slice(-4)}`
+                          )
+                        ) : (
+                          <span className="text-slate-400 font-sans font-normal">—</span>
+                        )}
+                      </td>
                       <td className="p-2.5 sm:p-3 font-semibold text-slate-700">{row.colAF || '—'}</td>
                       <td className="p-2.5 sm:p-3 font-bold text-slate-800">{row.colV || '—'}</td>
                     </tr>
                   ))}
                   {filteredModalCards.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="p-8 text-center text-slate-500 font-medium">
+                      <td colSpan={7} className="p-8 text-center text-slate-500 font-medium">
                         No Job Card matching &quot;{modalSearch}&quot; found in active Sansad.
                       </td>
                     </tr>

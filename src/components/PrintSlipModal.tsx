@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Printer, X, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { Printer, X, ShieldCheck, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 import QRCode from 'qrcode';
 import { BeneficiaryRow } from '../types';
 import { NationalEmblemLogo, VbGramGActLogo } from './Emblems';
@@ -16,6 +16,9 @@ export const PrintSlipModal: React.FC<PrintSlipModalProps> = ({
   onClose
 }) => {
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
+  const [showFullAadhaar, setShowFullAadhaar] = useState<boolean>(true);
+  const [printOrientation, setPrintOrientation] = useState<'portrait' | 'landscape'>('portrait');
+  const [paperSize, setPaperSize] = useState<'A4' | 'A5'>('A4');
 
   useEffect(() => {
     // Add print isolation class to body while modal is open
@@ -57,12 +60,86 @@ export const PrintSlipModal: React.FC<PrintSlipModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto print-modal-root print-slip-modal-root">
       <div className="relative w-full max-w-xl bg-white border border-slate-200 rounded-3xl shadow-2xl p-6 overflow-hidden print-modal-card">
         {/* Top Actions - Hidden during Print */}
-        <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100 no-print">
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-4 mb-4 border-b border-slate-100 no-print">
           <div className="flex items-center gap-2 text-slate-900 font-black text-sm">
             <Printer className="w-4 h-4 text-emerald-600" />
             <span>Official Acknowledgement Slip</span>
           </div>
-          <div className="flex items-center gap-2.5">
+
+          {/* Orientation & Size Toolbar */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center rounded-xl bg-slate-100 p-0.5 border border-slate-200 text-xs">
+              <button
+                type="button"
+                onClick={() => setPrintOrientation('portrait')}
+                className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                  printOrientation === 'portrait'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Portrait Orientation (খাড়া)"
+              >
+                📄 Portrait
+              </button>
+              <button
+                type="button"
+                onClick={() => setPrintOrientation('landscape')}
+                className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                  printOrientation === 'landscape'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Landscape Orientation (আড়াআড়ি)"
+              >
+                📃 Landscape
+              </button>
+            </div>
+
+            <div className="flex items-center rounded-xl bg-slate-100 p-0.5 border border-slate-200 text-xs">
+              <button
+                type="button"
+                onClick={() => setPaperSize('A4')}
+                className={`px-2 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                  paperSize === 'A4'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Standard A4 Paper"
+              >
+                A4
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaperSize('A5')}
+                className={`px-2 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                  paperSize === 'A5'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Compact A5 Paper"
+              >
+                A5
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowFullAadhaar(!showFullAadhaar)}
+              className="px-3 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all"
+              title="Toggle Full 12-digit Aadhaar / Masked"
+            >
+              {showFullAadhaar ? (
+                <>
+                  <EyeOff className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Mask Aadhaar</span>
+                </>
+              ) : (
+                <>
+                  <Eye className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Show Full</span>
+                </>
+              )}
+            </button>
             <button
               onClick={handlePrint}
               id="printSlipModalBtn"
@@ -80,6 +157,16 @@ export const PrintSlipModal: React.FC<PrintSlipModalProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Dynamic Print CSS for Portrait/Landscape & Paper Size */}
+        <style>{`
+          @media print {
+            @page {
+              size: ${paperSize} ${printOrientation} !important;
+              margin: ${paperSize === 'A5' ? '4mm' : '8mm 6mm'} !important;
+            }
+          }
+        `}</style>
 
         {/* The Printable Slip Paper (A5 / 4x6 Layout) */}
         <div id="printableSlipArea" className="bg-white text-slate-900 p-6 rounded-2xl shadow-xs font-sans text-[12px] border border-slate-200">
@@ -146,9 +233,21 @@ export const PrintSlipModal: React.FC<PrintSlipModalProps> = ({
                 <td className="py-1.5 font-mono text-slate-900">{row.colQ || "—"}</td>
               </tr>
               <tr className="border-b border-slate-200">
-                <td className="py-1.5 font-bold text-slate-600">Aadhaar ID (Masked):</td>
-                <td className="py-1.5 font-mono text-slate-800">
-                  {row.colP ? `XXXX-XXXX-${row.colP.slice(-4)}` : "—"}
+                <td className="py-1.5 font-bold text-slate-600">
+                  {showFullAadhaar ? "Aadhaar Card No (UID):" : "Aadhaar ID (Masked):"}
+                </td>
+                <td className="py-1.5 font-mono font-bold text-slate-900">
+                  {row.colP ? (
+                    showFullAadhaar ? (
+                      row.colP.length === 12
+                        ? `${row.colP.slice(0, 4)} ${row.colP.slice(4, 8)} ${row.colP.slice(8, 12)}`
+                        : row.colP
+                    ) : (
+                      `XXXX-XXXX-${row.colP.slice(-4)}`
+                    )
+                  ) : (
+                    <span className="text-slate-400">—</span>
+                  )}
                 </td>
               </tr>
               <tr className="border-b border-slate-200">

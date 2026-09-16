@@ -20,6 +20,7 @@ import { INITIAL_BANK_MASTER, SANSAD_LIST, VILLAGES_LIST } from './data/bankMast
 import { CANONICAL_29_VILLAGES, normalizeVillageName } from './utils/villageNormalizer';
 import { CANONICAL_16_SANSADS, normalizeSansadName, isHeaderOrJunkSansad, sortSansads, extractSansadNumber } from './utils/sansadNormalizer';
 import { normalizeJobCardBookDelivered } from './utils/jobCardDeliveryNormalizer';
+import { healBeneficiaryRecord } from './utils/beneficiaryHealer';
 import { safeStorage } from './utils/safeStorage';
 import { NationalEmblemLogo, VbGramGActLogo } from './components/Emblems';
 import { FileSpreadsheet, AlertCircle, RefreshCw, CheckCircle2, ShieldCheck } from 'lucide-react';
@@ -153,7 +154,8 @@ export default function App() {
           }
           const list = bData?.beneficiaries;
           if (Array.isArray(list) && list.length > 0) {
-            const normalized = list.map((b: BeneficiaryRow) => {
+            const normalized = list.map((rawB: BeneficiaryRow) => {
+              const b = healBeneficiaryRecord(rawB);
               const normVillage = normalizeVillageName(b.colV, b.colB);
               return {
                 ...b,
@@ -236,7 +238,8 @@ export default function App() {
                   bData = JSON.parse(bText);
                 } catch {}
                 if (bData?.beneficiaries && Array.isArray(bData.beneficiaries) && bData.beneficiaries.length > 0) {
-                  const normalized = bData.beneficiaries.map((b: BeneficiaryRow) => {
+                  const normalized = bData.beneficiaries.map((rawB: BeneficiaryRow) => {
+                    const b = healBeneficiaryRecord(rawB);
                     const normVillage = normalizeVillageName(b.colV, b.colB);
                     return {
                       ...b,

@@ -28,6 +28,7 @@ import * as XLSX from 'xlsx';
 import { BeneficiaryRow, GoogleSheetConfig, PERMANENT_BATHUARY_SHEET_URL, PERMANENT_APPS_SCRIPT_URL } from '../types';
 import { normalizeVillageName, CANONICAL_29_VILLAGES } from '../utils/villageNormalizer';
 import { normalizeSansadName, CANONICAL_16_SANSADS, isHeaderOrJunkSansad } from '../utils/sansadNormalizer';
+import { healBeneficiaryRecord } from '../utils/beneficiaryHealer';
 import { formatKycDate } from '../utils/dateFormatter';
 import { normalizeJobCardBookDelivered } from '../utils/jobCardDeliveryNormalizer';
 import { safeStorage } from '../utils/safeStorage';
@@ -497,33 +498,60 @@ export const GoogleSheetSyncModal: React.FC<GoogleSheetSyncModalProps> = ({
           ) {
             colMap['colY'] = colIdx;
           }
-          // Priority 2: Col W - Job Card Submitted to Office
+          // Priority 2: Col W - Job Card Submitted to Office (Exclude deletion columns!)
           else if (
-            val.includes('submitted') || 
-            val.includes('submission') || 
-            val.includes('জমা')
+            (val.includes('submitted') || val.includes('submission') || val.includes('জমা')) &&
+            !val.includes('deletion') && !val.includes('বাতিল')
           ) {
             colMap['colW'] = colIdx;
           }
-          // Priority 3: Col H - Job Card Number
+          // Priority 3: Col H - Job Card Number (Exclude applicant name combinations)
           else if (
             val === 'job card number' || 
             val === 'job card no' || 
             val === 'job card no.' || 
             val === 'job card' || 
             val === 'reg no' ||
-            ((val.includes('job') || val.includes('কার্ড')) && (val.includes('card') || val.includes('no') || val.includes('num') || val.includes('নম্বর')))
+            ((val.includes('job') || val.includes('কার্ড')) && (val.includes('card') || val.includes('no') || val.includes('num') || val.includes('নম্বর')) && !val.includes('name') && !val.includes('applicant'))
           ) {
             colMap['colH'] = colIdx;
           }
-          else if (val.includes('applicant') && val.includes('name')) colMap['colJ'] = colIdx;
-          else if (val === 'name' || val.includes('beneficiary') || val.includes('worker')) colMap['colJ'] = colIdx;
+          // Priority 4: Col Q - Worker Phone / Mobile (MUST check BEFORE worker/name checks to prevent phone mapping to name!)
+          else if (val.includes('mobile') || val.includes('phone') || val.includes('contact') || val.includes('ফোন')) {
+            colMap['colQ'] = colIdx;
+          }
+          // Priority 5: Col P - Aadhaar Number (UID) (Exclude name as per aadhaar, seeded, auth)
+          else if (
+            (val.includes('aadhaar') || val.includes('uid')) &&
+            !val.includes('name') &&
+            !val.includes('seeded') &&
+            !val.includes('auth') &&
+            !val.includes('demographic')
+          ) {
+            colMap['colP'] = colIdx;
+          }
+          // Priority 6: Col L - Name as per Aadhaar Card
+          else if (val.includes('name as per') || (val.includes('aadhaar') && val.includes('name'))) {
+            colMap['colL'] = colIdx;
+          }
+          // Priority 7: Family relations (Father/Husband & Head of Household)
           else if (val.includes('father') || val.includes('husband')) colMap['colAF'] = colIdx;
           else if (val.includes('head') || val.includes('hoh')) colMap['colAG'] = colIdx;
+          // Priority 8: Administrative units (Sansad & Village)
           else if (val.includes('sansad') || val.includes('ward') || val.includes('part')) colMap['colB'] = colIdx;
           else if (val.includes('village') || val.includes('gram') || val.includes('mouza')) colMap['colV'] = colIdx;
-          else if (val.includes('aadhaar') || val.includes('uid')) colMap['colP'] = colIdx;
-          else if (val.includes('mobile') || val.includes('phone') || val.includes('contact')) colMap['colQ'] = colIdx;
+          // Priority 9: Col J - Applicant Name (Strictly prevent phone, mobile, aadhaar, number, job card, head, father)
+          else if (
+            !val.includes('phone') && !val.includes('mobile') && !val.includes('contact') &&
+            !val.includes('aadhaar') && !val.includes('uid') && !val.includes('card') &&
+            !val.includes('father') && !val.includes('husband') && !val.includes('head') && !val.includes('hoh') &&
+            !val.includes('date') && !val.includes('status') && !val.includes('error') &&
+            (val === 'applicant name' || val === 'name of applicant' || val === 'beneficiary name' || val === 'worker name' || val === 'name' || (val.includes('applicant') && val.includes('name')))
+          ) {
+            if (colMap['colJ'] === undefined || colIdx < colMap['colJ']) {
+              colMap['colJ'] = colIdx;
+            }
+          }
           else if (val.includes('kyc') && (val.includes('date') || val.includes('dt') || val.includes('time') || val.includes('done on') || val.includes('day'))) colMap['colS'] = colIdx;
           else if (val.includes('kyc') || val.includes('e-kyc')) colMap['colR'] = colIdx;
           else if (val.includes('abps')) colMap['colO'] = colIdx;
@@ -588,7 +616,10 @@ export const GoogleSheetSyncModal: React.FC<GoogleSheetSyncModalProps> = ({
       const rawAbps = get('colO', 14).toUpperCase();
       const isAbpsActive = rawAbps === 'YES' || rawAbps === 'Y' || rawAbps === 'ENABLED' || rawAbps === '1';
 
-      const aadhaarClean = get('colP', 15).replace(/\D/g, '');
+      let aadhaarClean = get('colP', 15).replace(/\D/g, '');
+      if (aadhaarClean.length === 11) {
+        aadhaarClean = '0' + aadhaarClean;
+      }
       const mobileClean = get('colQ', 16).replace(/\D/g, '');
 
       const record: BeneficiaryRow = {
@@ -626,7 +657,7 @@ export const GoogleSheetSyncModal: React.FC<GoogleSheetSyncModalProps> = ({
         colAR: get('colAR', 43) || ''
       };
 
-      parsed.push(record);
+      parsed.push(healBeneficiaryRecord(record));
     }
 
     return parsed;

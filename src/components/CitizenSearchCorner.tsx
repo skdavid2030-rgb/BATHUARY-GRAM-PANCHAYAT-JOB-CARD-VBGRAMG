@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, IdCard, CheckCircle2, Clock, Printer, FileCheck, MapPin, Building, CreditCard, User, X, Sparkles, AlertCircle } from 'lucide-react';
+import { Search, IdCard, CheckCircle2, Clock, Printer, FileCheck, MapPin, Building, CreditCard, User, X, Sparkles, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { BeneficiaryRow } from '../types';
 import { formatKycDate } from '../utils/dateFormatter';
 
@@ -15,6 +15,7 @@ export const CitizenSearchCorner: React.FC<CitizenSearchCornerProps> = ({
   onPrintA5Slip
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [showFullAadhaar, setShowFullAadhaar] = useState(true);
 
   const trimmed = searchTerm.trim().toLowerCase();
   const digitsOnly = trimmed.replace(/\D/g, '');
@@ -101,12 +102,28 @@ export const CitizenSearchCorner: React.FC<CitizenSearchCornerProps> = ({
       {/* Results Section */}
       {trimmed ? (
         <div className="space-y-4">
-          <div className="flex items-center justify-between text-xs font-black text-slate-700 px-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-black text-slate-700 px-2">
             <span className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
               <span>Search Results: {searchResults.length} records found</span>
             </span>
-            <span className="text-slate-400 font-medium">Showing top matches</span>
+            <button
+              type="button"
+              onClick={() => setShowFullAadhaar(!showFullAadhaar)}
+              className="px-3 py-1.5 text-xs font-bold rounded-xl border border-slate-300 bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+            >
+              {showFullAadhaar ? (
+                <>
+                  <EyeOff className="w-3.5 h-3.5 text-blue-600" />
+                  <span>আধার মাস্ক করুন (Mask Aadhaar)</span>
+                </>
+              ) : (
+                <>
+                  <Eye className="w-3.5 h-3.5 text-blue-600" />
+                  <span>সম্পূর্ণ ১২ সংখ্যার আধার দেখুন (Show Full Aadhaar)</span>
+                </>
+              )}
+            </button>
           </div>
 
           {searchResults.length > 0 ? (
@@ -201,9 +218,21 @@ export const CitizenSearchCorner: React.FC<CitizenSearchCornerProps> = ({
                         </span>
                       </div>
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 block">Aadhaar (Masked):</span>
-                        <span className="font-mono font-bold text-slate-700 truncate block">
-                          {row.colP ? `•••• •••• ${row.colP.slice(-4)}` : "Not Seeded"}
+                        <span className="text-[10px] font-bold text-slate-400 block">
+                          {showFullAadhaar ? "Aadhaar Number (12 Digits):" : "Aadhaar (Masked):"}
+                        </span>
+                        <span className="font-mono font-black text-slate-800 tracking-wide truncate block text-xs">
+                          {row.colP ? (
+                            showFullAadhaar ? (
+                              row.colP.length === 12
+                                ? `${row.colP.slice(0, 4)} ${row.colP.slice(4, 8)} ${row.colP.slice(8, 12)}`
+                                : row.colP
+                            ) : (
+                              `•••• •••• ${row.colP.slice(-4)}`
+                            )
+                          ) : (
+                            <span className="text-amber-600 font-sans font-bold text-[11px]">শীটে নেই (Not in Sheet)</span>
+                          )}
                         </span>
                       </div>
                     </div>

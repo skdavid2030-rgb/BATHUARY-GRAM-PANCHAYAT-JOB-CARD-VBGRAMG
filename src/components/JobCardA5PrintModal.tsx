@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Printer, X, FileCheck, Building2, ShieldCheck, CheckCircle2, Clock } from 'lucide-react';
+import { Printer, X, FileCheck, Building2, ShieldCheck, CheckCircle2, Clock, Eye, EyeOff } from 'lucide-react';
 import QRCode from 'qrcode';
 import { BeneficiaryRow } from '../types';
 import { NationalEmblemLogo, VbGramGActLogo } from './Emblems';
@@ -17,6 +17,9 @@ export const JobCardA5PrintModal: React.FC<JobCardA5PrintModalProps> = ({
   onClose
 }) => {
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
+  const [showFullAadhaar, setShowFullAadhaar] = useState<boolean>(true);
+  const [printOrientation, setPrintOrientation] = useState<'portrait' | 'landscape'>('portrait');
+  const [paperSize, setPaperSize] = useState<'A5' | 'A4'>('A5');
 
   // Find all family members under the exact same Job Card Number (Col H)
   const familyMembers = allBeneficiaries.filter(
@@ -71,15 +74,90 @@ export const JobCardA5PrintModal: React.FC<JobCardA5PrintModalProps> = ({
       <div className="relative w-full max-w-lg bg-white border border-slate-200 rounded-2xl shadow-2xl p-3 sm:p-4 my-auto overflow-hidden print-modal-card">
         
         {/* Modal Top Bar - Hidden during Print */}
-        <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-200 no-print">
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-2 mb-2 border-b border-slate-200 no-print">
           <div className="flex items-center gap-2 text-slate-900 font-bold text-xs sm:text-sm">
             <FileCheck className="w-4 h-4 text-sky-600" />
             <span>Job Card Print Preview</span>
             <span className="text-[10px] bg-sky-100 text-sky-800 font-semibold px-2 py-0.5 rounded-full">
-              Standard A5 Format
+              {paperSize} {printOrientation === 'portrait' ? 'Portrait' : 'Landscape'}
             </span>
           </div>
-          <div className="flex items-center gap-2">
+
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Orientation Selector */}
+            <div className="flex items-center rounded-xl bg-slate-100 p-0.5 border border-slate-200 text-xs">
+              <button
+                type="button"
+                onClick={() => setPrintOrientation('portrait')}
+                className={`px-2 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                  printOrientation === 'portrait'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Portrait Orientation (খাড়া)"
+              >
+                📄 Portrait
+              </button>
+              <button
+                type="button"
+                onClick={() => setPrintOrientation('landscape')}
+                className={`px-2 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                  printOrientation === 'landscape'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Landscape Orientation (আড়াআড়ি)"
+              >
+                📃 Landscape
+              </button>
+            </div>
+
+            {/* Paper Size Selector */}
+            <div className="flex items-center rounded-xl bg-slate-100 p-0.5 border border-slate-200 text-xs">
+              <button
+                type="button"
+                onClick={() => setPaperSize('A5')}
+                className={`px-2 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                  paperSize === 'A5'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="A5 Format"
+              >
+                A5
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaperSize('A4')}
+                className={`px-2 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                  paperSize === 'A4'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="A4 Full Page"
+              >
+                A4
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowFullAadhaar(!showFullAadhaar)}
+              className="px-2.5 py-1 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center gap-1 cursor-pointer shadow-2xs transition-all"
+              title="Toggle Full 12-digit Aadhaar / Masked"
+            >
+              {showFullAadhaar ? (
+                <>
+                  <EyeOff className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Mask</span>
+                </>
+              ) : (
+                <>
+                  <Eye className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Show 12 Digits</span>
+                </>
+              )}
+            </button>
             <button
               onClick={handlePrint}
               id="printJobCardNowBtn"
@@ -98,6 +176,16 @@ export const JobCardA5PrintModal: React.FC<JobCardA5PrintModalProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Dynamic Print CSS for Portrait/Landscape & Paper Size */}
+        <style>{`
+          @media print {
+            @page {
+              size: ${paperSize} ${printOrientation} !important;
+              margin: ${paperSize === 'A5' ? '4mm' : '8mm 6mm'} !important;
+            }
+          }
+        `}</style>
 
         {/* Printable Area - Designed mathematically for A5 Portrait (148mm x 210mm) with deep ink contrast */}
         <div 
@@ -277,8 +365,9 @@ export const JobCardA5PrintModal: React.FC<JobCardA5PrintModalProps> = ({
                   <tr className="bg-slate-900 border-b-2 border-slate-900 text-white font-black text-[10px]">
                     <th className="py-1 px-2 border-r border-slate-700 w-10 text-center">No</th>
                     <th className="py-1 px-2 border-r border-slate-700">Applicant Name</th>
-                    <th className="py-1 px-2 border-r border-slate-700 text-center w-24">ABPS</th>
-                    <th className="py-1 px-2 border-r border-slate-700 text-center w-24">e-KYC</th>
+                    <th className="py-1 px-2 border-r border-slate-700 text-center w-28">Aadhaar No</th>
+                    <th className="py-1 px-2 border-r border-slate-700 text-center w-20">ABPS</th>
+                    <th className="py-1 px-2 border-r border-slate-700 text-center w-20">e-KYC</th>
                     <th className="py-1 px-2 text-center w-24">e-KYC Date</th>
                   </tr>
                 </thead>
@@ -301,6 +390,21 @@ export const JobCardA5PrintModal: React.FC<JobCardA5PrintModalProps> = ({
                             <span className="text-[9px] text-slate-500 font-normal">
                               Gender: {member.colK}
                             </span>
+                          )}
+                        </td>
+
+                        {/* Aadhaar No (Col P) */}
+                        <td className="py-1 px-2 border-r border-slate-300 text-center font-mono font-bold text-slate-900 whitespace-nowrap text-[10px]">
+                          {member.colP ? (
+                            showFullAadhaar ? (
+                              member.colP.length === 12
+                                ? `${member.colP.slice(0, 4)} ${member.colP.slice(4, 8)} ${member.colP.slice(8, 12)}`
+                                : member.colP
+                            ) : (
+                              `•••• ${member.colP.slice(-4)}`
+                            )
+                          ) : (
+                            <span className="text-slate-400 font-sans">—</span>
                           )}
                         </td>
 

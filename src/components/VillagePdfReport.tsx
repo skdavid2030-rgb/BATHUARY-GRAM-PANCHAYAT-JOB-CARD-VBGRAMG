@@ -13,7 +13,9 @@ import {
   Clock,
   UserX,
   Users,
-  Loader2
+  Loader2,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { BeneficiaryRow } from '../types';
@@ -49,6 +51,7 @@ export const VillagePdfReport: React.FC<VillagePdfReportProps> = ({
   const [printOrientation, setPrintOrientation] = useState<'PORTRAIT' | 'LANDSCAPE'>('LANDSCAPE');
   const [isPrinting, setIsPrinting] = useState<boolean>(false);
   const [isPreparingPrint, setIsPreparingPrint] = useState<boolean>(false);
+  const [showFullAadhaar, setShowFullAadhaar] = useState<boolean>(true);
 
   useEffect(() => {
     const handleBeforePrint = () => setIsPrinting(true);
@@ -238,6 +241,24 @@ export const VillagePdfReport: React.FC<VillagePdfReportProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => setShowFullAadhaar(!showFullAadhaar)}
+              className="px-3.5 py-2.5 bg-white hover:bg-indigo-50 text-indigo-900 font-bold text-xs rounded-xl border-2 border-indigo-200 hover:border-indigo-400 flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+              title="১২ সংখ্যার সম্পূর্ণ আধার নম্বর এবং মাস্ক করা আধারের মধ্যে পরিবর্তন করুন"
+            >
+              {showFullAadhaar ? (
+                <>
+                  <EyeOff className="w-4 h-4 text-indigo-600" />
+                  <span>আধার মাস্ক করুন</span>
+                </>
+              ) : (
+                <>
+                  <Eye className="w-4 h-4 text-indigo-600" />
+                  <span>সম্পূর্ণ আধার দেখুন (12 Digits)</span>
+                </>
+              )}
+            </button>
             <button
               type="button"
               onClick={handleExportExcel}
@@ -647,8 +668,18 @@ export const VillagePdfReport: React.FC<VillagePdfReportProps> = ({
                     <td className="p-2.5 sm:p-3 font-black text-slate-950 uppercase border-r border-slate-200">{row.colJ}</td>
                     <td className="p-2.5 sm:p-3 text-slate-700 uppercase font-medium border-r border-slate-200">{row.colAG || "—"}</td>
                     <td className="p-2.5 sm:p-3 text-slate-800 font-bold border-r border-slate-200 whitespace-nowrap">{row.colV}</td>
-                    <td className="p-2.5 sm:p-3 font-mono text-slate-700 font-bold border-r border-slate-200 whitespace-nowrap">
-                      {row.colP ? `•••• ${row.colP.slice(-4)}` : "—"}
+                    <td className="p-2.5 sm:p-3 font-mono text-slate-800 font-bold border-r border-slate-200 whitespace-nowrap">
+                      {row.colP ? (
+                        showFullAadhaar ? (
+                          row.colP.length === 12
+                            ? `${row.colP.slice(0, 4)} ${row.colP.slice(4, 8)} ${row.colP.slice(8, 12)}`
+                            : row.colP
+                        ) : (
+                          `•••• ${row.colP.slice(-4)}`
+                        )
+                      ) : (
+                        <span className="text-slate-400 font-sans font-normal">—</span>
+                      )}
                     </td>
                     <td className="p-2.5 sm:p-3 text-center border-r border-slate-200 whitespace-nowrap">
                       <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase shadow-2xs ${
@@ -727,7 +758,15 @@ export const VillagePdfReport: React.FC<VillagePdfReportProps> = ({
                       <td className="p-1 text-black uppercase border-r border-slate-400 break-words text-[7pt]">{row.colAG || "—"}</td>
                       <td className="p-1 text-black font-bold border-r border-slate-400 break-words text-[7pt]">{row.colV}</td>
                       <td className="p-1 font-mono text-black text-center border-r border-slate-400 whitespace-nowrap text-[7pt]">
-                        {row.colP ? `•••• ${row.colP.slice(-4)}` : "—"}
+                        {row.colP ? (
+                          showFullAadhaar ? (
+                            row.colP.length === 12
+                              ? `${row.colP.slice(0, 4)} ${row.colP.slice(4, 8)} ${row.colP.slice(8, 12)}`
+                              : row.colP
+                          ) : (
+                            `•••• ${row.colP.slice(-4)}`
+                          )
+                        ) : "—"}
                       </td>
                       <td className="p-1 text-center border-r border-slate-400">
                         <span className="inline-block px-1 py-0.5 border border-black font-bold uppercase text-[6.5pt] leading-tight">

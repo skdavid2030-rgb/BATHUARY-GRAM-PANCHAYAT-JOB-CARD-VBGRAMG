@@ -391,6 +391,63 @@ function saveSheetConfig(config: Partial<GoogleSheetConfig>): GoogleSheetConfig 
   return updated;
 }
 
+function healBeneficiaryRecord(b: BeneficiaryRow): BeneficiaryRow {
+  if (!b) return b;
+  let name = String(b.colJ || '').trim();
+  let aadhaar = String(b.colP || '').replace(/\D/g, '');
+  let mobile = String(b.colQ || '').replace(/\D/g, '');
+  const aadhaarName = String(b.colL || '').trim();
+  const hohName = String(b.colAG || '').trim();
+  const fatherName = String(b.colAF || '').trim();
+
+  // Strip spaces and hyphens to inspect if name is actually numeric digits
+  const cleanNameOnly = name.replace(/[\s-]/g, '');
+  const nameDigits = name.replace(/\D/g, '');
+  const isNameDigitsOnly = nameDigits.length >= 8 && (cleanNameOnly === nameDigits);
+
+  if (isNameDigitsOnly) {
+    // colJ was mistakenly containing a phone (10 digits) or Aadhaar (12 digits)!
+    if (nameDigits.length === 12 && (!aadhaar || aadhaar.length !== 12)) {
+      aadhaar = nameDigits;
+    } else if (nameDigits.length === 10 && (!mobile || mobile.length !== 10)) {
+      mobile = nameDigits;
+    }
+
+    // Recover genuine human name using AI heuristic priority
+    if (aadhaarName && !/^\d+$/.test(aadhaarName.replace(/[\s-]/g, ''))) {
+      name = aadhaarName.toUpperCase();
+    } else if (hohName && !/^\d+$/.test(hohName.replace(/[\s-]/g, ''))) {
+      name = hohName.toUpperCase();
+    } else if (fatherName && !/^\d+$/.test(fatherName.replace(/[\s-]/g, ''))) {
+      name = `APPLICANT (${fatherName.toUpperCase()})`;
+    } else {
+      name = 'BENEFICIARY';
+    }
+  }
+
+  // What if Aadhaar contains letters and Name contains numbers?
+  if (b.colP && /[a-zA-Z]/.test(b.colP) && !/^\d+$/.test(b.colP.replace(/[\s-]/g, ''))) {
+    const textInAadhaar = b.colP.trim();
+    if (isNameDigitsOnly) {
+      aadhaar = nameDigits;
+      name = textInAadhaar.toUpperCase();
+    }
+  }
+
+  // 11-digit Aadhaar auto-padding to 12 digits
+  if (aadhaar.length === 11) {
+    aadhaar = '0' + aadhaar;
+  }
+
+  return {
+    ...b,
+    colJ: name,
+    colP: aadhaar,
+    colQ: mobile,
+    colL: aadhaarName || name
+  };
+}
+
 function loadSavedBeneficiaries(): BeneficiaryRow[] | null {
   try {
     const filePath = findExistingFilePath("beneficiaries_cache.json");
@@ -398,7 +455,7 @@ function loadSavedBeneficiaries(): BeneficiaryRow[] | null {
       const raw = fs.readFileSync(filePath, "utf-8");
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+        return parsed.map(healBeneficiaryRecord);
       }
     }
   } catch (err) {
@@ -496,33 +553,60 @@ function parseAndMapSheetRows(rawData: any[][]): BeneficiaryRow[] {
         ) {
           colMap['colY'] = colIdx;
         }
-        // Priority 2: Col W - Job Card Submitted to Office
+        // Priority 2: Col W - Job Card Submitted to Office (Exclude deletion columns!)
         else if (
-          val.includes('submitted') || 
-          val.includes('submission') || 
-          val.includes('জমা')
+          (val.includes('submitted') || val.includes('submission') || val.includes('জমা')) &&
+          !val.includes('deletion') && !val.includes('বাতিল')
         ) {
           colMap['colW'] = colIdx;
         }
-        // Priority 3: Col H - Job Card Number
+        // Priority 3: Col H - Job Card Number (Exclude applicant name combinations)
         else if (
           val === 'job card number' || 
           val === 'job card no' || 
           val === 'job card no.' || 
           val === 'job card' || 
           val === 'reg no' ||
-          ((val.includes('job') || val.includes('কার্ড')) && (val.includes('card') || val.includes('no') || val.includes('num') || val.includes('নম্বর')))
+          ((val.includes('job') || val.includes('কার্ড')) && (val.includes('card') || val.includes('no') || val.includes('num') || val.includes('নম্বর')) && !val.includes('name') && !val.includes('applicant'))
         ) {
           colMap['colH'] = colIdx;
         }
-        else if (val === 'applicant name' || (val.includes('applicant') && val.includes('name') && !val.includes('job card'))) colMap['colJ'] = colIdx;
-        else if (val === 'name' || val.includes('beneficiary') || val.includes('worker')) colMap['colJ'] = colIdx;
+        // Priority 4: Col Q - Worker Phone / Mobile (MUST check BEFORE worker/name checks to prevent phone mapping to name!)
+        else if (val.includes('mobile') || val.includes('phone') || val.includes('contact') || val.includes('ফোন')) {
+          colMap['colQ'] = colIdx;
+        }
+        // Priority 5: Col P - Aadhaar Number (UID) (Exclude name as per aadhaar, seeded, auth)
+        else if (
+          (val.includes('aadhaar') || val.includes('uid')) &&
+          !val.includes('name') &&
+          !val.includes('seeded') &&
+          !val.includes('auth') &&
+          !val.includes('demographic')
+        ) {
+          colMap['colP'] = colIdx;
+        }
+        // Priority 6: Col L - Name as per Aadhaar Card
+        else if (val.includes('name as per') || (val.includes('aadhaar') && val.includes('name'))) {
+          colMap['colL'] = colIdx;
+        }
+        // Priority 7: Family relations (Father/Husband & Head of Household)
         else if (val.includes('father') || val.includes('husband')) colMap['colAF'] = colIdx;
         else if (val.includes('head') || val.includes('hoh')) colMap['colAG'] = colIdx;
+        // Priority 8: Administrative units (Sansad & Village)
         else if (val.includes('sansad') || val.includes('ward') || val.includes('part')) colMap['colB'] = colIdx;
         else if (val.includes('village') || val.includes('gram') || val.includes('mouza')) colMap['colV'] = colIdx;
-        else if (val.includes('aadhaar') || val.includes('uid')) colMap['colP'] = colIdx;
-        else if (val.includes('mobile') || val.includes('phone') || val.includes('contact')) colMap['colQ'] = colIdx;
+        // Priority 9: Col J - Applicant Name (Strictly prevent phone, mobile, aadhaar, number, job card, head, father)
+        else if (
+          !val.includes('phone') && !val.includes('mobile') && !val.includes('contact') &&
+          !val.includes('aadhaar') && !val.includes('uid') && !val.includes('card') &&
+          !val.includes('father') && !val.includes('husband') && !val.includes('head') && !val.includes('hoh') &&
+          !val.includes('date') && !val.includes('status') && !val.includes('error') &&
+          (val === 'applicant name' || val === 'name of applicant' || val === 'beneficiary name' || val === 'worker name' || val === 'name' || (val.includes('applicant') && val.includes('name')))
+        ) {
+          if (colMap['colJ'] === undefined || colIdx < colMap['colJ']) {
+            colMap['colJ'] = colIdx;
+          }
+        }
         else if (val.includes('kyc') && (val.includes('date') || val.includes('dt') || val.includes('time') || val.includes('done on') || val.includes('day'))) colMap['colS'] = colIdx;
         else if (val.includes('kyc') || val.includes('e-kyc')) colMap['colR'] = colIdx;
         else if (val.includes('abps')) colMap['colO'] = colIdx;
@@ -594,7 +678,10 @@ function parseAndMapSheetRows(rawData: any[][]): BeneficiaryRow[] {
     const rawAbps = get('colO', 14).toUpperCase();
     const isAbpsActive = rawAbps === 'YES' || rawAbps === 'Y' || rawAbps === 'ENABLED' || rawAbps === '1';
 
-    const aadhaarClean = get('colP', 15).replace(/\D/g, '');
+    let aadhaarClean = get('colP', 15).replace(/\D/g, '');
+    if (aadhaarClean.length === 11) {
+      aadhaarClean = '0' + aadhaarClean;
+    }
     const mobileClean = get('colQ', 16).replace(/\D/g, '');
 
     const record: BeneficiaryRow = {
@@ -642,7 +729,7 @@ function parseAndMapSheetRows(rawData: any[][]): BeneficiaryRow[] {
       })()
     };
 
-    parsed.push(record);
+    parsed.push(healBeneficiaryRecord(record));
   }
 
   return parsed;
