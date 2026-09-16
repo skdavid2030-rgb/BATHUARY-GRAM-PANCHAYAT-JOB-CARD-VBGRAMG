@@ -101,8 +101,9 @@ export interface VillageStat {
 
 export type ReportCategoryFilter = 'ALL' | 'TOTAL' | 'DONE' | 'PENDING' | 'DEATH' | 'UNIQUE_CARDS';
 
-// Official Permanent Google Sheet URL for Bathuary Gram Panchayat
+// Official Permanent Google Sheet & 2-Way Apps Script Webhook URLs for Bathuary Gram Panchayat
 export const PERMANENT_BATHUARY_SHEET_URL = "https://docs.google.com/spreadsheets/d/1fCKKSgYo6LphZs39JURZIDZtAYBiH9JPgjOyS3Xu-PU/edit?usp=sharing";
+export const PERMANENT_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyikTK1-U5gkscBrHMXsNjwkEgeyYxMtq5za-X_Rey6WdZ7B7i93nevx9lK3x7SB5t4bA/exec";
 
 export interface GoogleSheetConfig {
   sheetUrl: string;

@@ -56,3 +56,43 @@ export function normalizeJobCardBookDelivered(value: any, allowEmpty: boolean = 
   return 'No';
 }
 
+/**
+ * AI-Assisted Normalizer for "Job Card Submitted" (Column W / Column 23)
+ */
+export function normalizeJobCardSubmitted(value: any, allowEmpty: boolean = false): 'Yes' | 'No' {
+  if (value === null || value === undefined) return allowEmpty ? ('' as any) : 'No';
+  const raw = String(value).trim();
+  if (!raw) return allowEmpty ? ('' as any) : 'No';
+
+  const lower = raw.toLowerCase();
+
+  if (
+    lower === 'yes' ||
+    lower === 'y' ||
+    lower === '1' ||
+    lower === 'true' ||
+    lower.includes('submit') ||
+    lower.includes('done') ||
+    lower.includes('completed') ||
+    lower.includes('জমা') ||
+    lower.includes('হ্যাঁ')
+  ) {
+    return 'Yes';
+  }
+
+  if (
+    lower === 'no' ||
+    lower === 'n' ||
+    lower === '0' ||
+    lower === 'false' ||
+    lower.includes('not') ||
+    lower.includes('pending') ||
+    lower.includes('না') ||
+    lower.includes('বাকি')
+  ) {
+    return 'No';
+  }
+
+  return 'No';
+}
+

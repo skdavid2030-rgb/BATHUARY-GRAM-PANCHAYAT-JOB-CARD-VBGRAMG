@@ -141,14 +141,18 @@ export const HomeOverview: React.FC<HomeOverviewProps> = ({
             </div>
 
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
-              <button
-                type="button"
+              <div
                 onClick={onOpenSyncModal}
-                className="btn-3d-save px-4 py-2.5 rounded-xl text-white font-black text-xs flex items-center justify-center gap-2 cursor-pointer shadow-lg"
+                className="px-4 py-2.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/40 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-lg transition-all"
+                title="Official Bathuary GP Google Sheet is permanently connected and auto-syncing. Click to view status."
               >
-                <FileSpreadsheet className="w-4 h-4 animate-bounce" />
-                <span>Link Google Sheet</span>
-              </button>
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+                </span>
+                <FileSpreadsheet className="w-4 h-4 text-emerald-300" />
+                <span>গুগল শীট অটো-কানেক্টেড (Live)</span>
+              </div>
               <button
                 type="button"
                 onClick={() => onNavigateTab('dashboard')}
@@ -442,19 +446,20 @@ export const HomeOverview: React.FC<HomeOverviewProps> = ({
                 <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-teal-600 to-emerald-600 text-white flex items-center justify-center shadow-lg shadow-teal-500/30 group-hover:scale-110 transition-transform">
                   <FileSpreadsheet className="w-5 h-5" />
                 </div>
-                <span className="text-[11px] font-black text-teal-900 bg-teal-100/80 px-2.5 py-0.5 rounded-full border border-teal-200 shadow-2xs">
-                  Permanent Sync
+                <span className="text-[11px] font-black text-emerald-900 bg-emerald-100/90 px-2.5 py-0.5 rounded-full border border-emerald-300 shadow-2xs flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                  Auto-Sync Active
                 </span>
               </div>
               <h3 className="text-base font-black text-slate-900 group-hover:text-teal-700 transition-colors">
-                Google Sheet Connection
+                Google Sheet Live Auto-Sync
               </h3>
               <p className="text-xs text-slate-600 mt-1.5 leading-relaxed font-medium">
-                Direct live synchronization via Google Sheet link or file upload. Zero Apps Script dependency, complete data ownership.
+                বাথুয়ারী গ্রাম পঞ্চায়েতের অফিসিয়াল গুগল স্প্রেডশীট পার্মানেন্টলি কানেক্টেড। ওয়েবসাইট ওপেন হলেই তথ্য নিজে থেকে অটো-সিঙ্ক হয়ে যায়।
               </p>
             </div>
             <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-black text-teal-800">
-              <span>Connect / Update Sheet</span>
+              <span>View Sync Status & Settings</span>
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1.5 transition-transform" />
             </div>
           </div>

@@ -1,0 +1,41 @@
+{
+  "WB-11-028-002-001/001": {
+    "jobCard": "WB-11-028-002-001/001",
+    "rowIndex": 2,
+    "fields": {
+      "rowIndex": 2,
+      "colA": "1",
+      "colB": "BATHUARY 1",
+      "colC": "1",
+      "colD": "PURBA MEDINIPUR",
+      "colE": "EGRA - II",
+      "colF": "BATHUARY",
+      "colH": "WB-11-028-002-001/001",
+      "colI": "1",
+      "colJ": "7319246039",
+      "colK": "M",
+      "colL": "JAYDEB BAR",
+      "colM": "Yes",
+      "colN": "Yes",
+      "colO": "Yes",
+      "colP": "547154560380",
+      "colQ": "7319246039",
+      "colR": "Yes",
+      "colS": "13/01/2026",
+      "colT": "",
+      "colU": "SUPRABHAT PARUA, SECRETARY",
+      "colV": "GAGNA",
+      "colW": "Yes",
+      "colX": "",
+      "colY": "Yes",
+      "colAF": "SRIKANTA BAR",
+      "colAG": "JOYEDEB BAR",
+      "colAO": "",
+      "colAP": "",
+      "colAQ": "",
+      "colAR": ""
+    },
+    "status": "synced_to_sheet",
+    "updatedAt": "2026-09-15T12:26:05.463Z"
+  }
+}

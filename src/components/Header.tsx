@@ -156,15 +156,16 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               id="header-link-sheet-btn"
               onClick={onOpenSyncModal}
-              className="flex items-center gap-1.5 text-white btn-3d-save px-3.5 py-1.5 rounded-xl font-black cursor-pointer shadow-md"
-              title="Official Bathuary GP Google Sheet permanently linked and active"
+              className="flex items-center gap-1.5 text-white bg-emerald-800/90 hover:bg-emerald-700 border border-emerald-500/50 px-3.5 py-1.5 rounded-xl font-bold cursor-pointer shadow-md transition-all"
+              title="Official Bathuary GP Google Sheet is permanently linked and auto-syncing. Click to inspect sync details."
             >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-white animate-pulse" />
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-300" />
               <span className="hidden sm:inline">
-                💾 GOOGLE SHEET LIVE
+                SHEET CONNECTED
               </span>
               <span className="sm:hidden">
-                💾 SHEET LIVE
+                CONNECTED
               </span>
             </button>
 

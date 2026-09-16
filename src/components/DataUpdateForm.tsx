@@ -33,6 +33,23 @@ interface DataUpdateFormProps {
   language?: 'bn' | 'en';
 }
 
+const FORM_FIELD_DEFINITIONS: Array<{ key: string; label: string }> = [
+  { key: 'colP', label: 'Aadhaar / ID Number (Col P)' },
+  { key: 'colQ', label: 'Phone Number (Col Q)' },
+  { key: 'colR', label: 'e-KYC Done (Col R)' },
+  { key: 'colS', label: 'Date of e-KYC Done (Col S)' },
+  { key: 'colT', label: 'Error / Death Remark (Col T)' },
+  { key: 'colU', label: 'e-KYC Processed by (Col U)' },
+  { key: 'colV', label: 'Village Name (Col V)' },
+  { key: 'colW', label: 'Job Card Submitted (Col W)' },
+  { key: 'colX', label: 'Remarks (Col X)' },
+  { key: 'colY', label: 'Job Card Book Delivered (Col Y)' },
+  { key: 'colAO', label: 'Bank Name (Col AO)' },
+  { key: 'colAP', label: 'IFSC Code (Col AP)' },
+  { key: 'colAQ', label: 'Branch Name (Col AQ)' },
+  { key: 'colAR', label: 'Account Number (Col AR)' }
+];
+
 export const DataUpdateForm: React.FC<DataUpdateFormProps> = ({
   beneficiaries,
   bankMaster,
@@ -573,31 +590,24 @@ export const DataUpdateForm: React.FC<DataUpdateFormProps> = ({
     }
 
     // Calculate which fields have actually been modified compared to activeRow
-    const fieldDefinitions: Array<{ key: keyof typeof formData; label: string }> = [
-      { key: 'colP', label: 'Aadhaar / ID Number (Col P)' },
-      { key: 'colQ', label: 'Phone Number (Col Q)' },
-      { key: 'colR', label: 'e-KYC Done (Col R)' },
-      { key: 'colS', label: 'Date of e-KYC Done (Col S)' },
-      { key: 'colT', label: 'Error / Death Remark (Col T)' },
-      { key: 'colU', label: 'e-KYC Processed by (Col U)' },
-      { key: 'colV', label: 'Village Name (Col V)' },
-      { key: 'colW', label: 'Job Card Submitted (Col W)' },
-      { key: 'colX', label: 'Remarks (Col X)' },
-      { key: 'colY', label: 'Job Card Book Delivered (Col Y)' },
-      { key: 'colAO', label: 'Bank Name (Col AO)' },
-      { key: 'colAP', label: 'IFSC Code (Col AP)' },
-      { key: 'colAQ', label: 'Branch Name (Col AQ)' },
-      { key: 'colAR', label: 'Account Number (Col AR)' }
-    ];
-
     const detectedChanges: Array<{ key: string; label: string; value: string }> = [];
-    fieldDefinitions.forEach(({ key, label }) => {
-      const currentVal = (formData[key] || '').toString().trim();
+    FORM_FIELD_DEFINITIONS.forEach(({ key, label }) => {
+      const currentVal = ((formData as any)[key] || '').toString().trim();
       const originalVal = ((activeRow as any)[key] || '').toString().trim();
       if (currentVal !== originalVal) {
         detectedChanges.push({ key, label, value: currentVal });
       }
     });
+
+    // If no differences detected, include all entry fields with values so user can confirm and push to Google Sheet
+    if (detectedChanges.length === 0) {
+      FORM_FIELD_DEFINITIONS.forEach(({ key, label }) => {
+        const val = ((formData as any)[key] || '').toString().trim();
+        if (val !== '') {
+          detectedChanges.push({ key, label, value: val });
+        }
+      });
+    }
 
     setPendingChanges(detectedChanges);
     setShowConfirmModal(true);
@@ -608,8 +618,12 @@ export const DataUpdateForm: React.FC<DataUpdateFormProps> = ({
     if (!activeRow) return;
 
     const changedKeys = pendingChanges.map(c => c.key);
+    const effectiveChangedKeys = changedKeys.length > 0
+      ? changedKeys
+      : FORM_FIELD_DEFINITIONS.filter(d => ((formData as any)[d.key] || '').toString().trim() !== '').map(d => d.key);
+
     const fieldUpdates: Record<string, any> = {};
-    changedKeys.forEach(k => {
+    effectiveChangedKeys.forEach(k => {
       fieldUpdates[k] = (formData as any)[k];
     });
 
@@ -617,7 +631,7 @@ export const DataUpdateForm: React.FC<DataUpdateFormProps> = ({
     const saveRes = await onSaveRecord({
       rowIndex: activeRow.rowIndex,
       ...formData,
-      changedFields: changedKeys,
+      changedFields: effectiveChangedKeys,
       fieldUpdates
     } as any);
     setIsSaving(false);
@@ -1505,13 +1519,13 @@ export const DataUpdateForm: React.FC<DataUpdateFormProps> = ({
               Confirm Save?
             </h4>
             <p className="text-xs text-slate-600 mt-2">
-              Only the modified fields below will be updated in the Google Sheet:
+              নিম্নলিখিত ফিল্ডগুলি সরাসরি Google Sheet-এ সেভ হবে (Fields to update in Google Sheet):
             </p>
 
             {pendingChanges.length > 0 ? (
               <div className="my-3 p-3 bg-emerald-50 rounded-2xl border border-emerald-200 text-left max-h-48 overflow-y-auto">
                 <div className="text-[11px] font-black text-emerald-900 mb-1.5 flex items-center justify-between">
-                  <span>Modified Fields to Sync:</span>
+                  <span>Fields to Sync:</span>
                   <span className="bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded-full text-[10px]">
                     {pendingChanges.length} field{pendingChanges.length > 1 ? 's' : ''}
                   </span>
@@ -1527,7 +1541,7 @@ export const DataUpdateForm: React.FC<DataUpdateFormProps> = ({
               </div>
             ) : (
               <div className="my-3 p-3 bg-slate-50 rounded-2xl border border-slate-200 text-xs text-slate-600 font-medium">
-                No fields were changed.
+                No entry fields to save.
               </div>
             )}
 
