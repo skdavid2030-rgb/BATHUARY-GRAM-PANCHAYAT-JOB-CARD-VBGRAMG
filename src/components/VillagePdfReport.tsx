@@ -13,19 +13,17 @@ import {
   Clock,
   UserX,
   Users,
-  Loader2,
-  Eye,
-  EyeOff
+  Loader2
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { BeneficiaryRow } from '../types';
+import { BeneficiaryRow, ReportCategoryFilter } from '../types';
 import { VILLAGES_LIST, SANSAD_LIST } from '../data/bankMaster';
 import { NationalEmblemLogo, VbGramGActLogo } from './Emblems';
 import { formatKycDate } from '../utils/dateFormatter';
 
 interface VillagePdfReportProps {
   beneficiaries: BeneficiaryRow[];
-  initialCategoryFilter?: 'ALL' | 'TOTAL' | 'DONE' | 'PENDING' | 'DEATH' | 'UNIQUE_CARDS' | null;
+  initialCategoryFilter?: ReportCategoryFilter | null;
   initialSansadFilter?: string;
   onPrintSlip: (row: BeneficiaryRow) => void;
   onPrintA5Slip: (row: BeneficiaryRow) => void;
@@ -42,7 +40,7 @@ export const VillagePdfReport: React.FC<VillagePdfReportProps> = ({
   const [selectedVillage, setSelectedVillage] = useState<string>('');
   const [selectedSansad, setSelectedSansad] = useState<string>(initialSansadFilter || '');
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [selectedCategory, setSelectedCategory] = useState<'ALL' | 'TOTAL' | 'DONE' | 'PENDING' | 'DEATH' | 'UNIQUE_CARDS'>(
+  const [selectedCategory, setSelectedCategory] = useState<ReportCategoryFilter>(
     initialCategoryFilter || 'ALL'
   );
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -51,7 +49,6 @@ export const VillagePdfReport: React.FC<VillagePdfReportProps> = ({
   const [printOrientation, setPrintOrientation] = useState<'PORTRAIT' | 'LANDSCAPE'>('LANDSCAPE');
   const [isPrinting, setIsPrinting] = useState<boolean>(false);
   const [isPreparingPrint, setIsPreparingPrint] = useState<boolean>(false);
-  const [showFullAadhaar, setShowFullAadhaar] = useState<boolean>(true);
 
   useEffect(() => {
     const handleBeforePrint = () => setIsPrinting(true);
@@ -95,6 +92,9 @@ export const VillagePdfReport: React.FC<VillagePdfReportProps> = ({
         if (kyc === 'YES' || kyc === 'Y' || err.includes('death') || err.includes('expired') || err.includes('died')) {
           return false;
         }
+      } else if (selectedCategory === 'BOOK_DELIVERED') {
+        const deliv = (row.colY || '').trim().toUpperCase();
+        if (deliv !== 'YES' && deliv !== 'Y') return false;
       }
 
       // Text search inside filtered view
@@ -180,6 +180,7 @@ export const VillagePdfReport: React.FC<VillagePdfReportProps> = ({
       "e-KYC Done": r.colR,
       "e-KYC Date": r.colS,
       "Error / Death": r.colT,
+      "Book Delivered (Col Y)": r.colY || "No",
       "Bank Name": r.colAO,
       "IFSC Code": r.colAP,
       "Account No": r.colAR
@@ -241,24 +242,6 @@ export const VillagePdfReport: React.FC<VillagePdfReportProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
-            <button
-              type="button"
-              onClick={() => setShowFullAadhaar(!showFullAadhaar)}
-              className="px-3.5 py-2.5 bg-white hover:bg-indigo-50 text-indigo-900 font-bold text-xs rounded-xl border-2 border-indigo-200 hover:border-indigo-400 flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
-              title="১২ সংখ্যার সম্পূর্ণ আধার নম্বর এবং মাস্ক করা আধারের মধ্যে পরিবর্তন করুন"
-            >
-              {showFullAadhaar ? (
-                <>
-                  <EyeOff className="w-4 h-4 text-indigo-600" />
-                  <span>আধার মাস্ক করুন</span>
-                </>
-              ) : (
-                <>
-                  <Eye className="w-4 h-4 text-indigo-600" />
-                  <span>সম্পূর্ণ আধার দেখুন (12 Digits)</span>
-                </>
-              )}
-            </button>
             <button
               type="button"
               onClick={handleExportExcel}
@@ -363,6 +346,7 @@ export const VillagePdfReport: React.FC<VillagePdfReportProps> = ({
               <option value="DONE">✓ e-KYC Completed</option>
               <option value="PENDING">⏳ e-KYC Pending</option>
               <option value="DEATH">✕ Expired / Deceased</option>
+              <option value="BOOK_DELIVERED">📦 Job Card Book Delivered (Col Y)</option>
             </select>
           </div>
 
@@ -525,7 +509,7 @@ export const VillagePdfReport: React.FC<VillagePdfReportProps> = ({
           <div className="mt-2 pt-1.5 border-t border-slate-900 grid grid-cols-5 gap-1 text-[8pt] font-extrabold text-slate-900 uppercase">
             <span className="text-left truncate">Sansad: {selectedSansad || 'ALL SANSADS'}</span>
             <span className="text-center truncate">Village: {selectedVillage || 'ALL VILLAGES'}</span>
-            <span className="text-center truncate">Status: {selectedCategory}</span>
+            <span className="text-center truncate">Status: {selectedCategory === 'BOOK_DELIVERED' ? 'JOB CARD BOOK DELIVERED (COL Y)' : selectedCategory}</span>
             <span className="text-center">Date: {todayStr}</span>
             <span className="text-right">Total: {rowsToPrint.length}</span>
           </div>
@@ -670,27 +654,27 @@ export const VillagePdfReport: React.FC<VillagePdfReportProps> = ({
                     <td className="p-2.5 sm:p-3 text-slate-800 font-bold border-r border-slate-200 whitespace-nowrap">{row.colV}</td>
                     <td className="p-2.5 sm:p-3 font-mono text-slate-800 font-bold border-r border-slate-200 whitespace-nowrap">
                       {row.colP ? (
-                        showFullAadhaar ? (
-                          row.colP.length === 12
-                            ? `${row.colP.slice(0, 4)} ${row.colP.slice(4, 8)} ${row.colP.slice(8, 12)}`
-                            : row.colP
-                        ) : (
-                          `•••• ${row.colP.slice(-4)}`
-                        )
+                        `XXXX-XXXX-${row.colP.slice(-4)}`
                       ) : (
                         <span className="text-slate-400 font-sans font-normal">—</span>
                       )}
                     </td>
                     <td className="p-2.5 sm:p-3 text-center border-r border-slate-200 whitespace-nowrap">
-                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase shadow-2xs ${
-                        isDone 
-                          ? 'bg-emerald-100 text-emerald-950 border border-emerald-300'
-                          : isDead 
-                            ? 'bg-rose-100 text-rose-950 border border-rose-300'
-                            : 'bg-amber-100 text-amber-950 border border-amber-300'
-                      }`}>
-                        {isDone ? "✓ Done" : isDead ? "Expired" : "Pending"}
-                      </span>
+                      {selectedCategory === 'BOOK_DELIVERED' ? (
+                        <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase shadow-2xs bg-cyan-100 text-cyan-950 border border-cyan-400">
+                          📦 Delivered
+                        </span>
+                      ) : (
+                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase shadow-2xs ${
+                          isDone 
+                            ? 'bg-emerald-100 text-emerald-950 border border-emerald-300'
+                            : isDead 
+                              ? 'bg-rose-100 text-rose-950 border border-rose-300'
+                              : 'bg-amber-100 text-amber-950 border border-amber-300'
+                        }`}>
+                          {isDone ? "✓ Done" : isDead ? "Expired" : "Pending"}
+                        </span>
+                      )}
                     </td>
                     <td className="p-2.5 sm:p-3 text-center no-print print:hidden action-column-cell" data-no-print="true">
                       <div className="flex items-center justify-center gap-1.5 no-print print:hidden" data-no-print="true">
@@ -758,19 +742,11 @@ export const VillagePdfReport: React.FC<VillagePdfReportProps> = ({
                       <td className="p-1 text-black uppercase border-r border-slate-400 break-words text-[7pt]">{row.colAG || "—"}</td>
                       <td className="p-1 text-black font-bold border-r border-slate-400 break-words text-[7pt]">{row.colV}</td>
                       <td className="p-1 font-mono text-black text-center border-r border-slate-400 whitespace-nowrap text-[7pt]">
-                        {row.colP ? (
-                          showFullAadhaar ? (
-                            row.colP.length === 12
-                              ? `${row.colP.slice(0, 4)} ${row.colP.slice(4, 8)} ${row.colP.slice(8, 12)}`
-                              : row.colP
-                          ) : (
-                            `•••• ${row.colP.slice(-4)}`
-                          )
-                        ) : "—"}
+                        {row.colP ? `XXXX-XXXX-${row.colP.slice(-4)}` : "—"}
                       </td>
                       <td className="p-1 text-center border-r border-slate-400">
                         <span className="inline-block px-1 py-0.5 border border-black font-bold uppercase text-[6.5pt] leading-tight">
-                          {isDone ? "Done" : isDead ? "Expired" : "Pending"}
+                          {selectedCategory === 'BOOK_DELIVERED' ? "Delivered" : isDone ? "Done" : isDead ? "Expired" : "Pending"}
                         </span>
                       </td>
                     </tr>

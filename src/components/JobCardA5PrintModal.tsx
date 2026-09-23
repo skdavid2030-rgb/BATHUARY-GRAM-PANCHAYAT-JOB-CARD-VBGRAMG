@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Printer, X, FileCheck, Building2, ShieldCheck, CheckCircle2, Clock, Eye, EyeOff } from 'lucide-react';
+import { Printer, X, FileCheck, Building2, ShieldCheck, CheckCircle2, Clock } from 'lucide-react';
 import QRCode from 'qrcode';
 import { BeneficiaryRow } from '../types';
 import { NationalEmblemLogo, VbGramGActLogo } from './Emblems';
@@ -17,7 +17,6 @@ export const JobCardA5PrintModal: React.FC<JobCardA5PrintModalProps> = ({
   onClose
 }) => {
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
-  const [showFullAadhaar, setShowFullAadhaar] = useState<boolean>(true);
   const [printOrientation, setPrintOrientation] = useState<'portrait' | 'landscape'>('portrait');
   const [paperSize, setPaperSize] = useState<'A5' | 'A4'>('A5');
 
@@ -140,24 +139,6 @@ export const JobCardA5PrintModal: React.FC<JobCardA5PrintModalProps> = ({
               </button>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setShowFullAadhaar(!showFullAadhaar)}
-              className="px-2.5 py-1 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center gap-1 cursor-pointer shadow-2xs transition-all"
-              title="Toggle Full 12-digit Aadhaar / Masked"
-            >
-              {showFullAadhaar ? (
-                <>
-                  <EyeOff className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Mask</span>
-                </>
-              ) : (
-                <>
-                  <Eye className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Show 12 Digits</span>
-                </>
-              )}
-            </button>
             <button
               onClick={handlePrint}
               id="printJobCardNowBtn"
@@ -396,13 +377,7 @@ export const JobCardA5PrintModal: React.FC<JobCardA5PrintModalProps> = ({
                         {/* Aadhaar No (Col P) */}
                         <td className="py-1 px-2 border-r border-slate-300 text-center font-mono font-bold text-slate-900 whitespace-nowrap text-[10px]">
                           {member.colP ? (
-                            showFullAadhaar ? (
-                              member.colP.length === 12
-                                ? `${member.colP.slice(0, 4)} ${member.colP.slice(4, 8)} ${member.colP.slice(8, 12)}`
-                                : member.colP
-                            ) : (
-                              `•••• ${member.colP.slice(-4)}`
-                            )
+                            `XXXX-XXXX-${member.colP.slice(-4)}`
                           ) : (
                             <span className="text-slate-400 font-sans">—</span>
                           )}

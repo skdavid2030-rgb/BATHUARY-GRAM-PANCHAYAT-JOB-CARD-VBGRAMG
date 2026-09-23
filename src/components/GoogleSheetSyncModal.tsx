@@ -1203,12 +1203,13 @@ export const GoogleSheetSyncModal: React.FC<GoogleSheetSyncModalProps> = ({
             <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-bold text-slate-800">
-                  Google Apps Script Web App URL:
+                  Google Apps Script Web App URL (Source of Truth):
                 </label>
                 {appsScriptUrl.trim() && (
-                  <span className="text-[10px] text-emerald-700 bg-emerald-100 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <span className="text-[10px] text-emerald-800 bg-emerald-100/90 font-black px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-emerald-300">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                     <Check className="w-3 h-3 text-emerald-600" />
-                    <span>কনফিগার করা আছে</span>
+                    <span>স্থায়ীভাবে সংযুক্ত ও সক্রিয় (Permanently Active)</span>
                   </span>
                 )}
               </div>

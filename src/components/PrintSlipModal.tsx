@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Printer, X, ShieldCheck, CheckCircle2, Eye, EyeOff } from 'lucide-react';
+import { Printer, X, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { BeneficiaryRow } from '../types';
 import { NationalEmblemLogo, VbGramGActLogo } from './Emblems';
@@ -16,7 +16,6 @@ export const PrintSlipModal: React.FC<PrintSlipModalProps> = ({
   onClose
 }) => {
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
-  const [showFullAadhaar, setShowFullAadhaar] = useState<boolean>(true);
   const [printOrientation, setPrintOrientation] = useState<'portrait' | 'landscape'>('portrait');
   const [paperSize, setPaperSize] = useState<'A4' | 'A5'>('A4');
 
@@ -123,24 +122,6 @@ export const PrintSlipModal: React.FC<PrintSlipModalProps> = ({
             </div>
 
             <button
-              type="button"
-              onClick={() => setShowFullAadhaar(!showFullAadhaar)}
-              className="px-3 py-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs transition-all"
-              title="Toggle Full 12-digit Aadhaar / Masked"
-            >
-              {showFullAadhaar ? (
-                <>
-                  <EyeOff className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Mask Aadhaar</span>
-                </>
-              ) : (
-                <>
-                  <Eye className="w-3.5 h-3.5 text-blue-600" />
-                  <span>Show Full</span>
-                </>
-              )}
-            </button>
-            <button
               onClick={handlePrint}
               id="printSlipModalBtn"
               className="px-5 py-2 rounded-xl btn-3d-save text-white font-extrabold text-xs sm:text-sm flex items-center gap-1.5 cursor-pointer"
@@ -233,18 +214,10 @@ export const PrintSlipModal: React.FC<PrintSlipModalProps> = ({
                 <td className="py-1.5 font-mono text-slate-900">{row.colQ || "—"}</td>
               </tr>
               <tr className="border-b border-slate-200">
-                <td className="py-1.5 font-bold text-slate-600">
-                  {showFullAadhaar ? "Aadhaar Card No (UID):" : "Aadhaar ID (Masked):"}
-                </td>
+                <td className="py-1.5 font-bold text-slate-600">Aadhaar ID (Masked):</td>
                 <td className="py-1.5 font-mono font-bold text-slate-900">
                   {row.colP ? (
-                    showFullAadhaar ? (
-                      row.colP.length === 12
-                        ? `${row.colP.slice(0, 4)} ${row.colP.slice(4, 8)} ${row.colP.slice(8, 12)}`
-                        : row.colP
-                    ) : (
-                      `XXXX-XXXX-${row.colP.slice(-4)}`
-                    )
+                    `XXXX-XXXX-${row.colP.slice(-4)}`
                   ) : (
                     <span className="text-slate-400">—</span>
                   )}

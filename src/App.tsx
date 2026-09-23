@@ -13,7 +13,7 @@ import { JobCardA5PrintModal } from './components/JobCardA5PrintModal';
 import { GoogleSheetSyncModal } from './components/GoogleSheetSyncModal';
 import { LoginPage } from './components/LoginPage';
 
-import { BeneficiaryRow, AppUser, AnalyticsData, VillageStat, BankMasterItem, AuditLog, PERMANENT_BATHUARY_SHEET_URL } from './types';
+import { BeneficiaryRow, AppUser, AnalyticsData, VillageStat, BankMasterItem, AuditLog, PERMANENT_BATHUARY_SHEET_URL, ReportCategoryFilter } from './types';
 import { INITIAL_BENEFICIARIES } from './data/initialRecords';
 import { INITIAL_USERS } from './data/initialUsers';
 import { INITIAL_BANK_MASTER, SANSAD_LIST, VILLAGES_LIST } from './data/bankMaster';
@@ -80,13 +80,13 @@ export default function App() {
   const [selectedSansad, setSelectedSansad] = useState<string>('ALL');
 
   // Active Category Filter for Reports
-  const [categoryFilter, setCategoryFilter] = useState<'TOTAL' | 'DONE' | 'PENDING' | 'DEATH' | 'UNIQUE_CARDS' | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState<ReportCategoryFilter | null>(null);
 
   // Modals
   const [printRow, setPrintRow] = useState<BeneficiaryRow | null>(null);
   const [printA5Row, setPrintA5Row] = useState<BeneficiaryRow | null>(null);
   const [isSyncModalOpen, setIsSyncModalOpen] = useState<boolean>(false);
-  const [syncModalInitialMode, setSyncModalInitialMode] = useState<'sheetLink' | 'paste' | 'upload'>('sheetLink');
+  const [syncModalInitialMode, setSyncModalInitialMode] = useState<'sheetLink' | 'appsScript' | 'paste' | 'upload'>('sheetLink');
   const [activeAuditRow, setActiveAuditRow] = useState<BeneficiaryRow | null>(null);
 
   // Syncing state - permanently connected to Bathuary GP Google Sheet
@@ -244,7 +244,8 @@ export default function App() {
                     return {
                       ...b,
                       colV: normVillage,
-                      colB: normalizeSansadName(b.colB, normVillage) || 'SANSAD-I'
+                      colB: normalizeSansadName(b.colB, normVillage) || 'SANSAD-I',
+                      colY: normalizeJobCardBookDelivered(b.colY)
                     };
                   });
                   setBeneficiaries(normalized);
@@ -313,6 +314,7 @@ export default function App() {
   let death = 0;
   let abpsActive = 0;
   let aadhaarSeeded = 0;
+  let bookDelivered = 0;
 
   // STRICT 29 CANONICAL VILLAGES: Initialize map with exactly the 29 canonical villages
   const villageStatsMap: Record<string, VillageStat> = {};
@@ -324,6 +326,7 @@ export default function App() {
     const kyc = (row.colR || '').toUpperCase();
     const err = (row.colT || '').toLowerCase();
     const abps = (row.colO || '').toUpperCase();
+    const delivered = (row.colY || '').trim().toUpperCase();
 
     if (kyc === 'YES' || kyc === 'Y') {
       done++;
@@ -335,6 +338,7 @@ export default function App() {
 
     if (abps === 'YES' || abps === 'Y') abpsActive++;
     if (row.colP && row.colP.length === 12) aadhaarSeeded++;
+    if (delivered === 'YES' || delivered === 'Y') bookDelivered++;
 
     // Strict normalization to 29 canonical villages
     const v = normalizeVillageName(row.colV, row.colB);
@@ -360,7 +364,9 @@ export default function App() {
     pendingPct: total ? Math.round((pending / total) * 100) : 0,
     deathPct: total ? Math.round((death / total) * 100) : 0,
     abpsActive,
-    aadhaarSeeded
+    aadhaarSeeded,
+    bookDelivered,
+    bookDeliveredPct: total ? Math.round((bookDelivered / total) * 100) : 0
   };
 
   // Village stats include canonical 29 villages, plus 'No Village Name' if unassigned applicants exist
@@ -480,7 +486,7 @@ export default function App() {
   };
 
   // Switch to report by category
-  const handleSelectCategoryReport = (type: 'TOTAL' | 'DONE' | 'PENDING' | 'DEATH' | 'UNIQUE_CARDS') => {
+  const handleSelectCategoryReport = (type: ReportCategoryFilter) => {
     setCategoryFilter(type);
     setCurrentTab('reports');
   };

@@ -295,7 +295,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 text-emerald-300 font-bold text-[11px] border border-slate-700/80 transition-colors cursor-pointer"
             >
               <FileSpreadsheet className="w-3.5 h-3.5" />
-              <span>Google Sheet Settings</span>
+              <span>গুগল শিট স্ট্যাটাস (Permanent Link)</span>
             </button>
           </div>
         </div>

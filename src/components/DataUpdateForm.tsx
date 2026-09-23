@@ -29,7 +29,7 @@ interface DataUpdateFormProps {
   onSaveRecord: (data: Partial<BeneficiaryRow>) => Promise<{ success: boolean; googleSheetSynced?: boolean; googleSheetMessage?: string } | boolean>;
   onPrintSlip: (row: BeneficiaryRow) => void;
   onPrintA5Slip: (row: BeneficiaryRow) => void;
-  onOpenSyncModal?: (mode?: 'sheetLink' | 'paste' | 'upload') => void;
+  onOpenSyncModal?: (mode?: 'sheetLink' | 'appsScript' | 'paste' | 'upload') => void;
   language?: 'bn' | 'en';
 }
 
@@ -707,13 +707,16 @@ export const DataUpdateForm: React.FC<DataUpdateFormProps> = ({
           {onOpenSyncModal && (
             <button
               type="button"
-              onClick={() => onOpenSyncModal('sheetLink')}
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 border-2 border-emerald-300 text-emerald-800 text-xs font-black transition-all cursor-pointer self-start sm:self-auto shadow-xs hover:shadow-md"
-              title="Click to check or configure Google Sheet Live Sync"
+              onClick={() => onOpenSyncModal('appsScript')}
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 border-2 border-emerald-400 text-emerald-900 text-xs font-black transition-all cursor-pointer self-start sm:self-auto shadow-xs hover:shadow-md"
+              title="বাথুয়ারী গ্রাম পঞ্চায়েত গুগল স্প্রেডশীট ও Apps Script ওয়েবহুক স্থায়ীভাবে সক্রিয় রয়েছে।"
             >
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-600"></span>
+              </span>
               <Zap className="w-4 h-4 text-emerald-600 fill-emerald-600" />
-              <span>Google Sheet Live Sync</span>
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span>গুগল শিট স্থায়ীভাবে যুক্ত (2-Way Write Active)</span>
             </button>
           )}
         </div>

@@ -157,15 +157,15 @@ export const Header: React.FC<HeaderProps> = ({
               id="header-link-sheet-btn"
               onClick={onOpenSyncModal}
               className="flex items-center gap-1.5 text-white bg-emerald-800/90 hover:bg-emerald-700 border border-emerald-500/50 px-3.5 py-1.5 rounded-xl font-bold cursor-pointer shadow-md transition-all"
-              title="Official Bathuary GP Google Sheet is permanently linked and auto-syncing. Click to inspect sync details."
+              title="বাথুয়ারী গ্রাম পঞ্চায়েত গুগল স্প্রেডশীট ও Apps Script (Code.gs) ওয়েবহুক স্থায়ীভাবে সংযুক্ত এবং অটো-সিঙ্ক সক্রিয়।"
             >
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
               <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-300" />
               <span className="hidden sm:inline">
-                SHEET CONNECTED
+                স্থায়ী শিট লিঙ্কড (LIVE)
               </span>
               <span className="sm:hidden">
-                CONNECTED
+                LINKED
               </span>
             </button>
 

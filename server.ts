@@ -926,6 +926,56 @@ app.post("/api/rbi/autofix", (req: Request, res: Response) => {
 
 // ----------------------------------------------------------------------------
 /**
+ * Maps an item from Apps Script JSON (handleReadSheet) to a canonical BeneficiaryRow
+ */
+function mapAppsScriptItemToBeneficiary(item: any, index: number): BeneficiaryRow {
+  const rawSl = Number(item['Sheet Sl No'] || (index + 1));
+  const rawJc = String(item['Job Card Number'] || item['colH'] || '').trim();
+  const rawAadhaar = String(item['Aadhaar Number'] || item['colP'] || '').replace(/\D/g, '');
+  const rawPhone = String(item['Worker Phone Number (if available)'] || item['Worker Phone Number'] || item['colQ'] || '').replace(/\D/g, '');
+  const rawVillage = String(item['Village Name'] || item['colV'] || '').trim();
+  const rawSansad = String(item['Sansad Name & No'] || item['Sansad Name'] || item['colB'] || '').trim();
+  const rawDate = item['If Y , then record Date of e-KYC Successfully Done'] || item['eKycDate'] || item['colS'] || '';
+
+  const normVillage = normalizeVillageName(rawVillage, rawSansad);
+  const normSansad = normalizeSansadName(rawSansad, normVillage) || 'BATHUARY 1';
+
+  return healBeneficiaryRecord({
+    rowIndex: rawSl + 1,
+    colA: String(rawSl),
+    colB: normSansad,
+    colC: String(item['Sl.No'] || item['Sl No'] || rawSl),
+    colD: String(item['District'] || 'PURBA MEDINIPUR'),
+    colE: String(item['Block'] || 'EGRA - II'),
+    colF: String(item['Gram Panchayat'] || 'BATHUARY'),
+    colH: rawJc,
+    colI: String(item['Applicant No'] || '1'),
+    colJ: String(item['Applicant Name'] || '').trim(),
+    colK: String(item['Gender'] || '').trim(),
+    colL: String(item['Name as per Aadhaar Card'] || item['Applicant Name'] || '').trim(),
+    colM: String(item['Aadhaar Seeded in NREGASoft?'] || '').trim(),
+    colN: String(item['Demographic Authentication Done?'] || '').trim(),
+    colO: String(item['Enables for ABPS?'] || '').trim(),
+    colP: rawAadhaar,
+    colQ: rawPhone,
+    colR: String(item['E-KYC Sucessfully Done (Y/N)'] || item['e-KYC Done'] || '').trim(),
+    colS: formatKycDate(rawDate),
+    colT: String(item['If N , then record the error shown during e-KYC with the error no'] || item['If N , then Resone/Error Code'] || '').trim(),
+    colU: String(item['e-KYC Process done by [Name and Designation]'] || '').trim(),
+    colV: normVillage,
+    colW: normalizeJobCardSubmitted(String(item['Job Card has been Submitted to The Office(Yes/No)'] || '')),
+    colX: String(item['Remark'] || '').trim(),
+    colY: normalizeJobCardBookDelivered(String(item['Job Card Book Deliverd(Y/N)'] || item['Job Card Book Delivered'] || '')),
+    colAF: String(item['Father/Husband Name of House Hold'] || '').trim(),
+    colAG: String(item['Head of House Hold'] || '').trim(),
+    colAO: String(item['Bank Name'] || '').trim(),
+    colAP: String(item['IFSC Code'] || '').trim(),
+    colAQ: String(item['Branch Name'] || '').trim(),
+    colAR: String(item['Account Number'] || '').trim()
+  });
+}
+
+/**
  * Directly reads beneficiaries via Google Apps Script Web App (Code.gs)
  */
 async function fetchBeneficiariesFromAppsScript(scriptUrl: string): Promise<{
@@ -941,7 +991,7 @@ async function fetchBeneficiariesFromAppsScript(scriptUrl: string): Promise<{
   const fetchUrl = `${scriptUrl}${separator}action=read&format=json`;
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 25000);
+  const timer = setTimeout(() => controller.abort(), 35000);
 
   const response = await fetch(fetchUrl, {
     method: "GET",
@@ -970,21 +1020,15 @@ async function fetchBeneficiariesFromAppsScript(scriptUrl: string): Promise<{
   }
 
   if (json) {
-    if (Array.isArray(json.beneficiaries) && json.beneficiaries.length > 0) {
-      beneficiaries = json.beneficiaries.map((b: any) => ({
+    if (Array.isArray(json.data) && json.data.length > 0) {
+      // json.data is an array of row objects from user's Code.gs handleReadSheet
+      beneficiaries = json.data.map((item: any, idx: number) => mapAppsScriptItemToBeneficiary(item, idx));
+    } else if (Array.isArray(json.beneficiaries) && json.beneficiaries.length > 0) {
+      beneficiaries = json.beneficiaries.map((b: any) => healBeneficiaryRecord({
         ...b,
         colY: normalizeJobCardBookDelivered(b.colY),
         colW: normalizeJobCardSubmitted(b.colW)
       }));
-    } else if (Array.isArray(json.data) && json.data.length > 0) {
-      // json.data is an array of row objects where keys are sheet headers
-      const sampleItem = json.data[0];
-      const headers = Object.keys(sampleItem);
-      const rows: any[][] = [headers];
-      for (const item of json.data) {
-        rows.push(headers.map(h => item[h]));
-      }
-      beneficiaries = parseAndMapSheetRows(rows);
     }
   }
 
@@ -1170,6 +1214,7 @@ async function performLiveGoogleSheetSync(force: boolean = false): Promise<{
   }
 
   const cfg = loadSavedSheetConfig();
+  const scriptUrl = cfg.appsScriptUrl || PERMANENT_APPS_SCRIPT_URL;
   let urlToSync = activeSyncedSheetUrl || cfg.sheetUrl || PERMANENT_DEFAULT_SHEET_URL;
   if (!urlToSync || urlToSync.includes("script.google.com") || !urlToSync.includes("spreadsheets")) {
     urlToSync = PERMANENT_DEFAULT_SHEET_URL;
@@ -1178,18 +1223,33 @@ async function performLiveGoogleSheetSync(force: boolean = false): Promise<{
 
   isBackgroundSyncInProgress = true;
   try {
-    console.log(`[Permanent-Live-Sync] Pulling live data from Google Sheet: ${urlToSync}`);
-    let res: any;
-    try {
-      res = await fetchAndParseGoogleSheet(urlToSync);
-    } catch (primaryErr: any) {
-      if (urlToSync !== PERMANENT_DEFAULT_SHEET_URL) {
-        console.warn(`[Permanent-Live-Sync] Primary sheet sync failed, falling back to permanent default sheet:`, primaryErr.message);
-        res = await fetchAndParseGoogleSheet(PERMANENT_DEFAULT_SHEET_URL);
-        urlToSync = PERMANENT_DEFAULT_SHEET_URL;
-        activeSyncedSheetUrl = PERMANENT_DEFAULT_SHEET_URL;
-      } else {
-        throw primaryErr;
+    let res: any = null;
+
+    // STEP 1: PRIMARY SOURCE - Pull live data from official Google Apps Script Web App (user's mobile app Code.gs endpoint)
+    if (scriptUrl && scriptUrl.startsWith("https://script.google.com/")) {
+      try {
+        console.log(`[Permanent-Live-Sync] Pulling live data via Google Apps Script: ${scriptUrl}`);
+        res = await fetchBeneficiariesFromAppsScript(scriptUrl);
+        console.log(`[Permanent-Live-Sync] Apps Script live sync succeeded with ${res.beneficiaries.length} records.`);
+      } catch (gasErr: any) {
+        console.warn(`[Permanent-Live-Sync] Apps Script sync failed (${gasErr.message}), falling back to direct sheet export...`);
+      }
+    }
+
+    // STEP 2: FALLBACK SOURCE - Direct Google Spreadsheet CSV export
+    if (!res || !res.beneficiaries || res.beneficiaries.length === 0) {
+      console.log(`[Permanent-Live-Sync] Pulling live data from Google Sheet: ${urlToSync}`);
+      try {
+        res = await fetchAndParseGoogleSheet(urlToSync);
+      } catch (primaryErr: any) {
+        if (urlToSync !== PERMANENT_DEFAULT_SHEET_URL) {
+          console.warn(`[Permanent-Live-Sync] Primary sheet sync failed, falling back to permanent default sheet:`, primaryErr.message);
+          res = await fetchAndParseGoogleSheet(PERMANENT_DEFAULT_SHEET_URL);
+          urlToSync = PERMANENT_DEFAULT_SHEET_URL;
+          activeSyncedSheetUrl = PERMANENT_DEFAULT_SHEET_URL;
+        } else {
+          throw primaryErr;
+        }
       }
     }
     if (res.beneficiaries && res.beneficiaries.length > 0) {
@@ -2107,11 +2167,17 @@ app.get("/api/dashboard-stats", (req: Request, res: Response) => {
   let death = 0;
   let abpsActive = 0;
   let aadhaarSeeded = 0;
+  let bookDelivered = 0;
+  const uniqueCardsSet = new Set<string>();
 
   items.forEach(row => {
+    if (row.colH && row.colH.trim()) {
+      uniqueCardsSet.add(row.colH.trim());
+    }
     const kyc = (row.colR || "").toUpperCase();
     const err = (row.colT || "").toLowerCase();
     const abps = (row.colO || "").toUpperCase();
+    const delivered = (row.colY || "").trim().toUpperCase();
 
     if (kyc === "YES" || kyc === "Y") {
       done++;
@@ -2123,11 +2189,13 @@ app.get("/api/dashboard-stats", (req: Request, res: Response) => {
 
     if (abps === "YES" || abps === "Y") abpsActive++;
     if (row.colP && row.colP.length === 12) aadhaarSeeded++;
+    if (delivered === "YES" || delivered === "Y") bookDelivered++;
   });
 
   const donePct = total ? Math.round((done / total) * 100) : 0;
   const pendingPct = total ? Math.round((pending / total) * 100) : 0;
   const deathPct = total ? Math.round((death / total) * 100) : 0;
+  const bookDeliveredPct = total ? Math.round((bookDelivered / total) * 100) : 0;
 
   // Village-level breakdown (Guaranteed strictly 29 Bathuary GP Villages)
   const villageStatsMap: { [v: string]: { village: string; sansad: string; total: number; done: number; pending: number; death: number } } = {};
@@ -2171,6 +2239,7 @@ app.get("/api/dashboard-stats", (req: Request, res: Response) => {
   res.json({
     status: "success",
     total,
+    uniqueJobCards: uniqueCardsSet.size,
     done,
     pending,
     death,
@@ -2179,6 +2248,8 @@ app.get("/api/dashboard-stats", (req: Request, res: Response) => {
     deathPct,
     abpsActive,
     aadhaarSeeded,
+    bookDelivered,
+    bookDeliveredPct,
     villageStats
   });
 });
