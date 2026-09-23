@@ -965,7 +965,25 @@ function mapAppsScriptItemToBeneficiary(item: any, index: number): BeneficiaryRo
     colV: normVillage,
     colW: normalizeJobCardSubmitted(String(item['Job Card has been Submitted to The Office(Yes/No)'] || '')),
     colX: String(item['Remark'] || '').trim(),
-    colY: normalizeJobCardBookDelivered(String(item['Job Card Book Deliverd(Y/N)'] || item['Job Card Book Delivered'] || '')),
+    colY: (() => {
+      const direct = item['Job Card Book Delivered(Y/N)'] ??
+        item['Job Card Book Deliverd(Y/N)'] ??
+        item['Job Card Book Delivered'] ??
+        item['Job Card Book Deliverd'] ??
+        item['Job Card Book Delivered (Y/N)'] ??
+        item['colY'] ??
+        item.colY;
+      if (direct !== undefined && direct !== null && String(direct).trim() !== '') {
+        return normalizeJobCardBookDelivered(direct);
+      }
+      for (const k of Object.keys(item)) {
+        const lk = k.toLowerCase().trim();
+        if ((lk.includes('book') || lk.includes('বই')) && (lk.includes('deliver') || lk.includes('বিতরণ') || lk.includes('বিলি'))) {
+          return normalizeJobCardBookDelivered(item[k]);
+        }
+      }
+      return 'No';
+    })(),
     colAF: String(item['Father/Husband Name of House Hold'] || '').trim(),
     colAG: String(item['Head of House Hold'] || '').trim(),
     colAO: String(item['Bank Name'] || '').trim(),
@@ -2167,17 +2185,18 @@ app.get("/api/dashboard-stats", (req: Request, res: Response) => {
   let death = 0;
   let abpsActive = 0;
   let aadhaarSeeded = 0;
-  let bookDelivered = 0;
   const uniqueCardsSet = new Set<string>();
+  const deliveredCardsSet = new Set<string>();
 
   items.forEach(row => {
-    if (row.colH && row.colH.trim()) {
-      uniqueCardsSet.add(row.colH.trim());
+    const jc = (row.colH || "").trim();
+    if (jc) {
+      uniqueCardsSet.add(jc);
     }
     const kyc = (row.colR || "").toUpperCase();
     const err = (row.colT || "").toLowerCase();
     const abps = (row.colO || "").toUpperCase();
-    const delivered = (row.colY || "").trim().toUpperCase();
+    const isBookDelivered = normalizeJobCardBookDelivered(row.colY) === "Yes";
 
     if (kyc === "YES" || kyc === "Y") {
       done++;
@@ -2189,13 +2208,16 @@ app.get("/api/dashboard-stats", (req: Request, res: Response) => {
 
     if (abps === "YES" || abps === "Y") abpsActive++;
     if (row.colP && row.colP.length === 12) aadhaarSeeded++;
-    if (delivered === "YES" || delivered === "Y") bookDelivered++;
+    if (isBookDelivered && jc) {
+      deliveredCardsSet.add(jc);
+    }
   });
 
   const donePct = total ? Math.round((done / total) * 100) : 0;
   const pendingPct = total ? Math.round((pending / total) * 100) : 0;
   const deathPct = total ? Math.round((death / total) * 100) : 0;
-  const bookDeliveredPct = total ? Math.round((bookDelivered / total) * 100) : 0;
+  const bookDelivered = deliveredCardsSet.size;
+  const bookDeliveredPct = uniqueCardsSet.size ? Math.round((bookDelivered / uniqueCardsSet.size) * 100) : 0;
 
   // Village-level breakdown (Guaranteed strictly 29 Bathuary GP Villages)
   const villageStatsMap: { [v: string]: { village: string; sansad: string; total: number; done: number; pending: number; death: number } } = {};

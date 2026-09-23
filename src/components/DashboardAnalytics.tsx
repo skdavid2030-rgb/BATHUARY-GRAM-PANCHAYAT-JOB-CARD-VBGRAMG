@@ -25,6 +25,7 @@ import {
   EyeOff
 } from 'lucide-react';
 import { AnalyticsData, VillageStat, BeneficiaryRow, ReportCategoryFilter } from '../types';
+import { normalizeJobCardBookDelivered } from '../utils/jobCardDeliveryNormalizer';
 
 interface DashboardProps {
   analytics: AnalyticsData;
@@ -67,6 +68,23 @@ export const DashboardAnalytics: React.FC<DashboardProps> = ({
   }, [beneficiaries]);
 
   const uniqueJobCardCount = analytics.uniqueJobCards ?? uniqueJobCardList.length;
+
+  const uniqueDeliveredCards = useMemo(() => {
+    const set = new Set<string>();
+    for (const b of beneficiaries) {
+      const isDeliv = normalizeJobCardBookDelivered(b.colY) === 'Yes';
+      const jc = (b.colH || '').trim();
+      if (isDeliv && jc) {
+        set.add(jc);
+      }
+    }
+    return set.size;
+  }, [beneficiaries]);
+
+  const deliveredCount = selectedSansad && selectedSansad !== 'ALL'
+    ? uniqueDeliveredCards
+    : (analytics.bookDelivered !== undefined && analytics.bookDelivered > 0 ? analytics.bookDelivered : uniqueDeliveredCards);
+  const deliveredPct = uniqueJobCardCount > 0 ? Math.round((deliveredCount / uniqueJobCardCount) * 100) : 0;
 
   // Filtered unique cards for the drill-down modal
   const filteredModalCards = useMemo(() => {
@@ -320,7 +338,7 @@ export const DashboardAnalytics: React.FC<DashboardProps> = ({
           </div>
         </div>
 
-        {/* 6. Job Card Book Delivered (Col Y) */}
+        {/* 6. Job Card Book Delivered (Col Y Unique Job Cards) */}
         <div 
           onClick={() => onSelectCategoryReport('BOOK_DELIVERED')}
           className="rounded-3xl bg-gradient-to-br from-white via-cyan-50/50 to-blue-50/60 border-2 border-cyan-300 hover:border-cyan-600 p-4 sm:p-5 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer group hover:-translate-y-1 relative overflow-hidden"
@@ -333,19 +351,19 @@ export const DashboardAnalytics: React.FC<DashboardProps> = ({
             </div>
           </div>
           <div className="mt-3.5 flex items-baseline justify-between">
-            <h3 className="text-2xl sm:text-3xl font-black text-cyan-950 tracking-tight font-mono">{analytics.bookDelivered || 0}</h3>
+            <h3 className="text-2xl sm:text-3xl font-black text-cyan-950 tracking-tight font-mono">{deliveredCount}</h3>
             <span className="text-[10px] sm:text-xs font-black text-cyan-950 bg-cyan-100 px-2.5 py-1 rounded-full border border-cyan-400 shadow-2xs flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-cyan-600" />
-              {analytics.bookDeliveredPct || 0}%
+              {deliveredPct}%
             </span>
           </div>
-          <p className="text-[10.5px] text-slate-600 mt-1.5 font-semibold">Physical job card issued</p>
+          <p className="text-[10.5px] text-slate-600 mt-1.5 font-semibold">Unique job cards delivered</p>
           <div className="w-full bg-cyan-100 h-1.5 rounded-full mt-2.5 overflow-hidden">
-            <div className="bg-gradient-to-r from-cyan-500 to-blue-600 h-full rounded-full transition-all duration-500" style={{ width: `${analytics.bookDeliveredPct || 0}%` }} />
+            <div className="bg-gradient-to-r from-cyan-500 to-blue-600 h-full rounded-full transition-all duration-500" style={{ width: `${deliveredPct}%` }} />
           </div>
           <div className="mt-2.5 pt-2 border-t border-cyan-100/80 flex items-center justify-between text-[10px] text-cyan-800 font-bold">
-            <span>Delivered</span>
-            <span className="text-slate-400 font-mono font-medium">Col Y = Yes</span>
+            <span>Unique Books</span>
+            <span className="text-slate-400 font-mono font-medium">Col H unique • Col Y</span>
           </div>
         </div>
       </div>

@@ -20,6 +20,7 @@ import { BeneficiaryRow, ReportCategoryFilter } from '../types';
 import { VILLAGES_LIST, SANSAD_LIST } from '../data/bankMaster';
 import { NationalEmblemLogo, VbGramGActLogo } from './Emblems';
 import { formatKycDate } from '../utils/dateFormatter';
+import { normalizeJobCardBookDelivered } from '../utils/jobCardDeliveryNormalizer';
 
 interface VillagePdfReportProps {
   beneficiaries: BeneficiaryRow[];
@@ -93,8 +94,8 @@ export const VillagePdfReport: React.FC<VillagePdfReportProps> = ({
           return false;
         }
       } else if (selectedCategory === 'BOOK_DELIVERED') {
-        const deliv = (row.colY || '').trim().toUpperCase();
-        if (deliv !== 'YES' && deliv !== 'Y') return false;
+        const isDeliv = normalizeJobCardBookDelivered(row.colY) === 'Yes';
+        if (!isDeliv) return false;
       }
 
       // Text search inside filtered view
@@ -113,7 +114,7 @@ export const VillagePdfReport: React.FC<VillagePdfReportProps> = ({
       return true;
     });
 
-    if (selectedCategory === 'UNIQUE_CARDS') {
+    if (selectedCategory === 'UNIQUE_CARDS' || selectedCategory === 'BOOK_DELIVERED') {
       const seen = new Set<string>();
       rows = rows.filter(r => {
         const jc = (r.colH || '').trim();
@@ -346,7 +347,7 @@ export const VillagePdfReport: React.FC<VillagePdfReportProps> = ({
               <option value="DONE">✓ e-KYC Completed</option>
               <option value="PENDING">⏳ e-KYC Pending</option>
               <option value="DEATH">✕ Expired / Deceased</option>
-              <option value="BOOK_DELIVERED">📦 Job Card Book Delivered (Col Y)</option>
+              <option value="BOOK_DELIVERED">📦 Job Card Book Delivered (Col Y Unique Cards)</option>
             </select>
           </div>
 

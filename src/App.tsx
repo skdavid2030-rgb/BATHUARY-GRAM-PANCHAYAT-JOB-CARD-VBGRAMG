@@ -314,7 +314,8 @@ export default function App() {
   let death = 0;
   let abpsActive = 0;
   let aadhaarSeeded = 0;
-  let bookDelivered = 0;
+  const uniqueJobCardSet = new Set<string>();
+  const deliveredJobCardSet = new Set<string>();
 
   // STRICT 29 CANONICAL VILLAGES: Initialize map with exactly the 29 canonical villages
   const villageStatsMap: Record<string, VillageStat> = {};
@@ -323,10 +324,14 @@ export default function App() {
   });
 
   filteredBeneficiaries.forEach(row => {
+    const jc = (row.colH || '').trim();
+    if (jc) {
+      uniqueJobCardSet.add(jc);
+    }
     const kyc = (row.colR || '').toUpperCase();
     const err = (row.colT || '').toLowerCase();
     const abps = (row.colO || '').toUpperCase();
-    const delivered = (row.colY || '').trim().toUpperCase();
+    const isBookDelivered = normalizeJobCardBookDelivered(row.colY) === 'Yes';
 
     if (kyc === 'YES' || kyc === 'Y') {
       done++;
@@ -338,7 +343,9 @@ export default function App() {
 
     if (abps === 'YES' || abps === 'Y') abpsActive++;
     if (row.colP && row.colP.length === 12) aadhaarSeeded++;
-    if (delivered === 'YES' || delivered === 'Y') bookDelivered++;
+    if (isBookDelivered && jc) {
+      deliveredJobCardSet.add(jc);
+    }
 
     // Strict normalization to 29 canonical villages
     const v = normalizeVillageName(row.colV, row.colB);
@@ -355,8 +362,13 @@ export default function App() {
     }
   });
 
+  const uniqueJobCards = uniqueJobCardSet.size;
+  const bookDelivered = deliveredJobCardSet.size;
+  const bookDeliveredPct = uniqueJobCards ? Math.round((bookDelivered / uniqueJobCards) * 100) : 0;
+
   const analytics: AnalyticsData = {
     total,
+    uniqueJobCards,
     done,
     pending,
     death,
@@ -366,7 +378,7 @@ export default function App() {
     abpsActive,
     aadhaarSeeded,
     bookDelivered,
-    bookDeliveredPct: total ? Math.round((bookDelivered / total) * 100) : 0
+    bookDeliveredPct
   };
 
   // Village stats include canonical 29 villages, plus 'No Village Name' if unassigned applicants exist
