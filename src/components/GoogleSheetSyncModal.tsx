@@ -32,6 +32,7 @@ import { healBeneficiaryRecord } from '../utils/beneficiaryHealer';
 import { formatKycDate } from '../utils/dateFormatter';
 import { normalizeJobCardBookDelivered } from '../utils/jobCardDeliveryNormalizer';
 import { safeStorage } from '../utils/safeStorage';
+import { syncLiveGoogleSheet } from '../utils/liveSheetSync';
 import { MOBILE_APP_APPS_SCRIPT_CODE } from '../data/mobileAppCode';
 
 interface GoogleSheetSyncModalProps {
@@ -269,7 +270,7 @@ export const GoogleSheetSyncModal: React.FC<GoogleSheetSyncModalProps> = ({
     }
   };
 
-  // Direct Live Re-Sync from Google Sheet via backend live engine
+  // Direct Live Re-Sync from Google Sheet via backend live engine or direct client GViz pipeline
   const handleForceLiveRefresh = async () => {
     setIsLoading(true);
     setStatusMessage({
@@ -277,71 +278,33 @@ export const GoogleSheetSyncModal: React.FC<GoogleSheetSyncModalProps> = ({
       text: 'গুগল শীট থেকে সরাসরি লাইভ রিফ্রেশ করা হচ্ছে (Live syncing directly from Google Sheet)...'
     });
     try {
-      const res = await fetch('/api/google-sheet/refresh', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }
+      const res = await syncLiveGoogleSheet({
+        force: true,
+        sheetUrl: sheetUrl.trim() || undefined,
+        appsScriptUrl: appsScriptUrl.trim() || undefined
       });
 
-      let data: any = null;
-      try {
-        const text = await res.text();
-        if (text && text.trim().length > 0) {
-          data = JSON.parse(text);
-        }
-      } catch (parseErr) {
-        console.warn("JSON parse issue from refresh endpoint, trying fallback:", parseErr);
-      }
-
-      if (data && data.status === 'success') {
-        if (Array.isArray(data.beneficiaries) && data.beneficiaries.length > 0) {
-          onDataImported(data.beneficiaries);
-          setImportStats({
-            rows: data.total || data.beneficiaries.length,
-            villages: data.villagesCount || 29,
-            sansads: data.sansadsCount || 16
-          });
-        }
+      if (res.success && res.beneficiaries.length > 0) {
+        onDataImported(res.beneficiaries);
+        setImportStats({
+          rows: res.total,
+          villages: res.villagesCount || 29,
+          sansads: res.sansadsCount || 16
+        });
         setIsPermanentlySaved(true);
         setStatusMessage({
           type: 'success',
-          text: `✓ ${data.message || `লাইভ সিঙ্ক সফল! ${(data.total || currentCount || 8017).toLocaleString()} জন নাগরিকের ডাটা গুগল শীট থেকে আপডেট হয়েছে।`}`
+          text: `✓ লাইভ সিঙ্ক সফল! ${res.total.toLocaleString()} জন নাগরিকের ডাটা গুগল শীট থেকে আপডেট হয়েছে।`
         });
       } else {
-        // Safe fallback: fetch directly from /api/beneficiaries
-        const fallbackRes = await fetch('/api/beneficiaries');
-        const fallbackText = await fallbackRes.text();
-        let fallbackData: any = null;
-        try {
-          fallbackData = JSON.parse(fallbackText);
-        } catch {}
-
-        if (fallbackData && Array.isArray(fallbackData.beneficiaries) && fallbackData.beneficiaries.length > 0) {
-          onDataImported(fallbackData.beneficiaries);
-          setImportStats({
-            rows: fallbackData.total || fallbackData.beneficiaries.length,
-            villages: 29,
-            sansads: 16
-          });
-          setIsPermanentlySaved(true);
-          setStatusMessage({
-            type: 'success',
-            text: `✓ লাইভ সিঙ্ক সফল! ${(fallbackData.total || fallbackData.beneficiaries.length).toLocaleString()} জন নাগরিকের ডাটা গুগল শীট থেকে সক্রিয় রয়েছে।`
-          });
-        } else {
-          // If server endpoints had issues, run direct client-side spreadsheet parser
-          await handleFetchGoogleSheet();
-        }
+        throw new Error(res.message || 'ডাটা সিঙ্ক ব্যর্থ হয়েছে।');
       }
     } catch (err: any) {
       console.warn("Live refresh outer notice:", err);
-      try {
-        await handleFetchGoogleSheet();
-      } catch (fallbackErr: any) {
-        setStatusMessage({
-          type: 'error',
-          text: `লাইভ সিঙ্ক তথ্য: ${fallbackErr?.message || err?.message || 'গুগল শীট থেকে ডাটা সিঙ্ক হচ্ছে, অনুগ্রহ করে কয়েক সেকেন্ড পর পুনরায় চেষ্টা করুন।'}`
-        });
-      }
+      setStatusMessage({
+        type: 'error',
+        text: `লাইভ সিঙ্ক তথ্য: ${err?.message || 'গুগল শীট থেকে ডাটা সিঙ্ক হচ্ছে, অনুগ্রহ করে কয়েক সেকেন্ড পর পুনরায় চেষ্টা করুন।'}`
+      });
     } finally {
       setIsLoading(false);
     }

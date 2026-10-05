@@ -22,6 +22,8 @@ import { CANONICAL_16_SANSADS, normalizeSansadName, isHeaderOrJunkSansad, sortSa
 import { normalizeJobCardBookDelivered } from './utils/jobCardDeliveryNormalizer';
 import { healBeneficiaryRecord } from './utils/beneficiaryHealer';
 import { safeStorage } from './utils/safeStorage';
+import { syncLiveGoogleSheet } from './utils/liveSheetSync';
+import { loadCachedBeneficiaries, saveCachedBeneficiaries } from './utils/beneficiaryStorage';
 import { NationalEmblemLogo, VbGramGActLogo } from './components/Emblems';
 import { FileSpreadsheet, AlertCircle, RefreshCw, CheckCircle2, ShieldCheck } from 'lucide-react';
 
@@ -92,6 +94,8 @@ export default function App() {
   // Syncing state - permanently connected to Bathuary GP Google Sheet
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [isSheetPermanentlySaved, setIsSheetPermanentlySaved] = useState<boolean>(true);
+  const [autoSyncAlert, setAutoSyncAlert] = useState<{ visible: boolean; message: string } | null>(null);
+  const [lastSyncTimeString, setLastSyncTimeString] = useState<string>('Live Connected');
 
   // Helper to extract and sort clean sansads from records
   const updateSansadListFromRecords = (records: BeneficiaryRow[]) => {
@@ -107,7 +111,7 @@ export default function App() {
     }
   };
 
-  // Fetch initial data from Express backend with Live Google Sheet check
+  // Universal Live Data Synchronization (runs seamlessly in Dev server AND Netlify static host)
   const fetchAllData = async (forceLiveSync: boolean = false) => {
     setIsSyncing(true);
     try {
@@ -116,173 +120,125 @@ export default function App() {
         safeStorage.setItem('bathuary_google_sheet_url', PERMANENT_BATHUARY_SHEET_URL);
       }
 
-      // Parallel fetch to load data immediately without waterfall latency
-      const [cfgRes, bRes, uRes, aRes, bmRes] = await Promise.all([
-        fetch('/api/google-sheet/config').catch(() => null),
-        fetch(forceLiveSync ? '/api/google-sheet/refresh' : '/api/beneficiaries', {
-          method: forceLiveSync ? 'POST' : 'GET',
-          headers: forceLiveSync ? { 'Content-Type': 'application/json' } : {}
-        }).catch(() => null),
+      // 1. Run Universal Live Sync Engine (Direct Google Sheet GViz CSV / Apps Script / API)
+      const syncResult = await syncLiveGoogleSheet({ force: forceLiveSync });
+
+      if (syncResult.success && syncResult.beneficiaries.length > 0) {
+        setBeneficiaries(syncResult.beneficiaries);
+        updateSansadListFromRecords(syncResult.beneficiaries);
+        setIsSheetPermanentlySaved(true);
+        const timeStr = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+        setLastSyncTimeString(timeStr);
+
+        if (syncResult.isNewData && forceLiveSync) {
+          setAutoSyncAlert({
+            visible: true,
+            message: `✓ গুগল স্প্রেডশীট লাইভ ডাটা সফলভাবে সিঙ্ক হয়েছে (${syncResult.total.toLocaleString()} জন নাগরিকের ডাটা সক্রিয়)`
+          });
+          setTimeout(() => setAutoSyncAlert(null), 4000);
+        }
+      }
+
+      // 2. Fetch auxiliary endpoints if server environment is available
+      Promise.all([
         fetch('/api/users').catch(() => null),
         fetch('/api/audit-logs').catch(() => null),
         fetch('/api/bank-master').catch(() => null)
-      ]);
-
-      // 1. Process Google Sheet configuration
-      if (cfgRes && cfgRes.ok) {
-        try {
-          const text = await cfgRes.text();
-          if (text && text.trim().length > 0) {
-            const cfgData = JSON.parse(text);
-            if (cfgData.config?.sheetUrl) {
-              setIsSheetPermanentlySaved(true);
-              safeStorage.setItem('bathuary_google_sheet_url', cfgData.config.sheetUrl);
-            }
-          }
-        } catch {
-          // ignore
+      ]).then(async ([uRes, aRes, bmRes]) => {
+        if (uRes && uRes.ok) {
+          try {
+            const uData = await uRes.json();
+            if (uData.users && Array.isArray(uData.users)) setUsers(uData.users);
+          } catch {}
         }
-      }
-
-      // 2. Process Beneficiaries
-      if (bRes && bRes.ok) {
-        try {
-          const rawText = await bRes.text();
-          let bData: any = null;
-          if (rawText && rawText.trim().length > 0) {
-            bData = JSON.parse(rawText);
-          }
-          const list = bData?.beneficiaries;
-          if (Array.isArray(list) && list.length > 0) {
-            const normalized = list.map((rawB: BeneficiaryRow) => {
-              const b = healBeneficiaryRecord(rawB);
-              const normVillage = normalizeVillageName(b.colV, b.colB);
-              return {
-                ...b,
-                colV: normVillage,
-                colB: normalizeSansadName(b.colB, normVillage) || 'SANSAD-I',
-                colY: normalizeJobCardBookDelivered(b.colY)
-              };
-            });
-            setBeneficiaries(normalized);
-
-            if (bData.sansadList && Array.isArray(bData.sansadList) && bData.sansadList.length > 0) {
-              setSansadList(bData.sansadList);
-            } else {
-              updateSansadListFromRecords(normalized);
-            }
-          }
-        } catch (e) {
-          console.warn("Error parsing beneficiaries:", e);
+        if (aRes && aRes.ok) {
+          try {
+            const aData = await aRes.json();
+            if (aData.logs && Array.isArray(aData.logs)) setAuditLogs(aData.logs);
+          } catch {}
         }
-      }
-
-      // 3. Process Users
-      if (uRes && uRes.ok) {
-        try {
-          const uData = await uRes.json();
-          if (uData.users && Array.isArray(uData.users)) {
-            setUsers(uData.users);
-          }
-        } catch {}
-      }
-
-      // 4. Process Audit Logs
-      if (aRes && aRes.ok) {
-        try {
-          const aData = await aRes.json();
-          if (aData.logs && Array.isArray(aData.logs)) {
-            setAuditLogs(aData.logs);
-          }
-        } catch {}
-      }
-
-      // 5. Process Bank Master
-      if (bmRes && bmRes.ok) {
-        try {
-          const bmData = await bmRes.json();
-          if (bmData.banks && Array.isArray(bmData.banks)) {
-            setBankMaster(bmData.banks);
-          }
-        } catch {}
-      }
+        if (bmRes && bmRes.ok) {
+          try {
+            const bmData = await bmRes.json();
+            if (bmData.banks && Array.isArray(bmData.banks)) setBankMaster(bmData.banks);
+          } catch {}
+        }
+      }).catch(() => {});
     } catch (err) {
-      console.warn("Backend API not reachable yet:", err);
+      console.warn("Live sync error notice:", err);
     } finally {
       setIsSyncing(false);
     }
   };
 
-  // Continuous background 15-second live polling for permanent Google Sheet updates
+  // 1. Instant Cache Load from IndexedDB on startup & Immediate Live Sync
   useEffect(() => {
-    let lastKnownSyncTime = '';
+    let isMounted = true;
+    // Instant load from IndexedDB cache with 0 delay (even on Netlify refresh)
+    loadCachedBeneficiaries().then(cached => {
+      if (isMounted && cached && cached.length > 0) {
+        setBeneficiaries(cached);
+        updateSansadListFromRecords(cached);
+      }
+    });
+
+    // Immediate background live sync from Google Sheet
+    fetchAllData(true);
+
+    return () => { isMounted = false; };
+  }, []);
+
+  // 2. Continuous Real-time 15-second background poller for live Google Sheet edits
+  useEffect(() => {
+    let isMounted = true;
     const livePollingInterval = setInterval(async () => {
       try {
-        const statusRes = await fetch('/api/google-sheet/status');
-        if (statusRes.ok) {
-          const text = await statusRes.text();
-          let statusData: any = null;
-          try {
-            statusData = JSON.parse(text);
-          } catch {}
-          if (statusData && statusData.isSaved) {
-            setIsSheetPermanentlySaved(true);
-            // Only fetch full dataset if server has performed a new sync timestamp
-            if (statusData.lastSyncTimestamp && statusData.lastSyncTimestamp !== lastKnownSyncTime) {
-              lastKnownSyncTime = statusData.lastSyncTimestamp;
-              const bRes = await fetch('/api/beneficiaries');
-              if (bRes.ok) {
-                const bText = await bRes.text();
-                let bData: any = null;
-                try {
-                  bData = JSON.parse(bText);
-                } catch {}
-                if (bData?.beneficiaries && Array.isArray(bData.beneficiaries) && bData.beneficiaries.length > 0) {
-                  const normalized = bData.beneficiaries.map((rawB: BeneficiaryRow) => {
-                    const b = healBeneficiaryRecord(rawB);
-                    const normVillage = normalizeVillageName(b.colV, b.colB);
-                    return {
-                      ...b,
-                      colV: normVillage,
-                      colB: normalizeSansadName(b.colB, normVillage) || 'SANSAD-I',
-                      colY: normalizeJobCardBookDelivered(b.colY)
-                    };
-                  });
-                  setBeneficiaries(normalized);
-                }
-              }
-            }
+        const res = await syncLiveGoogleSheet({ force: false });
+        if (isMounted && res.success && res.beneficiaries.length > 0) {
+          if (res.isNewData) {
+            setBeneficiaries(res.beneficiaries);
+            updateSansadListFromRecords(res.beneficiaries);
+            const timeStr = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+            setLastSyncTimeString(timeStr);
+            setAutoSyncAlert({
+              visible: true,
+              message: `✓ গুগল স্প্রেডশীট এডিট স্বয়ংক্রিয়ভাবে সিঙ্ক হয়েছে (${res.total.toLocaleString()} জন নাগরিকের ডাটা লাইভ আপডেট)`
+            });
+            setTimeout(() => {
+              if (isMounted) setAutoSyncAlert(null);
+            }, 4500);
           }
         }
       } catch {
-        // quiet error
+        // silent background check
       }
     }, 15000);
 
-    return () => clearInterval(livePollingInterval);
+    return () => {
+      isMounted = false;
+      clearInterval(livePollingInterval);
+    };
   }, []);
 
-  // AI Smart Auto-Sync Engine on App Startup & Website Re-open
+  // 3. Auto-Sync on Tab Focus & Window Visibility
+  // (Automatically synchronizes when returning from Google Sheet tab or computer wake-up)
   useEffect(() => {
-    // 1. Instant cache load for zero lag
-    fetchAllData(false);
-
-    // 2. Automatic background live re-sync from Google Sheet without manual intervention
-    const liveSyncTimer = setTimeout(() => {
-      fetchAllData(true);
-    }, 600);
-
-    return () => clearTimeout(liveSyncTimer);
-  }, []);
-
-  // AI Smart Auto-Sync on Tab Focus & Window Visibility
-  // (Automatically synchronizes when returning from another tab or after computer wake-up)
-  useEffect(() => {
-    let lastFocusSync = Date.now();
-    const handleVisibilityOrFocus = () => {
-      if (document.visibilityState === 'visible' && Date.now() - lastFocusSync > 20000) {
+    let lastFocusSync = 0;
+    const handleVisibilityOrFocus = async () => {
+      if (document.visibilityState === 'visible' && Date.now() - lastFocusSync > 10000) {
         lastFocusSync = Date.now();
-        fetchAllData(false);
+        const res = await syncLiveGoogleSheet({ force: true });
+        if (res.success && res.beneficiaries.length > 0) {
+          if (res.isNewData) {
+            setBeneficiaries(res.beneficiaries);
+            updateSansadListFromRecords(res.beneficiaries);
+            setAutoSyncAlert({
+              visible: true,
+              message: `✓ গুগল স্প্রেডশীট লাইভ আপডেট সনাক্ত ও সমন্বিত হয়েছে!`
+            });
+            setTimeout(() => setAutoSyncAlert(null), 4000);
+          }
+        }
       }
     };
 
@@ -415,7 +371,11 @@ export default function App() {
       const data = await res.json().catch(() => ({}));
 
       if (res.ok) {
-        setBeneficiaries(prev => prev.map(b => b.rowIndex === formData.rowIndex ? { ...b, ...formData } : b));
+        setBeneficiaries(prev => {
+          const updated = prev.map(b => b.rowIndex === formData.rowIndex ? { ...b, ...formData } : b);
+          saveCachedBeneficiaries(updated);
+          return updated;
+        });
         setAuditLogs(prev => [
           {
             timestamp: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
@@ -434,7 +394,11 @@ export default function App() {
     } catch (err) {
       console.error("Save error:", err);
     }
-    setBeneficiaries(prev => prev.map(b => b.rowIndex === formData.rowIndex ? { ...b, ...formData } : b));
+    setBeneficiaries(prev => {
+      const updated = prev.map(b => b.rowIndex === formData.rowIndex ? { ...b, ...formData } : b);
+      saveCachedBeneficiaries(updated);
+      return updated;
+    });
     return { success: true };
   };
 
@@ -451,6 +415,7 @@ export default function App() {
 
     setBeneficiaries(normalized);
     updateSansadListFromRecords(normalized);
+    saveCachedBeneficiaries(normalized);
 
     try {
       await fetch('/api/beneficiaries/import', {
@@ -551,7 +516,22 @@ export default function App() {
           isPermanentlySaved={isSheetPermanentlySaved}
           currentUser={currentUser}
           onLogout={handleLogout}
+          lastSyncTime={lastSyncTimeString}
         />
+
+        {/* Real-time Google Sheet Auto-Sync Alert Toast */}
+        {autoSyncAlert && autoSyncAlert.visible && (
+          <div className="fixed top-20 right-4 z-50 animate-bounce duration-300 pointer-events-none no-print">
+            <div className="flex items-center gap-2.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white px-4 py-2.5 rounded-2xl shadow-2xl border border-emerald-300/40 text-xs font-bold">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"></span>
+              </span>
+              <CheckCircle2 className="w-4 h-4 text-emerald-200" />
+              <span>{autoSyncAlert.message}</span>
+            </div>
+          </div>
+        )}
 
         {/* Main Content Area */}
         <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 print:max-w-none print:p-0 print:m-0 print:w-full">

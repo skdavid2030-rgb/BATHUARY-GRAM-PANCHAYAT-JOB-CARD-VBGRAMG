@@ -33,6 +33,7 @@ interface HeaderProps {
   isPermanentlySaved?: boolean;
   currentUser?: AppUser;
   onLogout?: () => void;
+  lastSyncTime?: string;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -44,7 +45,8 @@ export const Header: React.FC<HeaderProps> = ({
   syncedSheetInfo,
   isPermanentlySaved,
   currentUser,
-  onLogout
+  onLogout,
+  lastSyncTime
 }) => {
   // Live Clock & Date state
   const [currentTime, setCurrentTime] = useState<string>('');
@@ -156,16 +158,19 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               id="header-link-sheet-btn"
               onClick={onOpenSyncModal}
-              className="flex items-center gap-1.5 text-white bg-emerald-800/90 hover:bg-emerald-700 border border-emerald-500/50 px-3.5 py-1.5 rounded-xl font-bold cursor-pointer shadow-md transition-all"
-              title="বাথুয়ারী গ্রাম পঞ্চায়েত গুগল স্প্রেডশীট ও Apps Script (Code.gs) ওয়েবহুক স্থায়ীভাবে সংযুক্ত এবং অটো-সিঙ্ক সক্রিয়।"
+              className="flex items-center gap-1.5 text-white bg-emerald-800/90 hover:bg-emerald-700 border border-emerald-500/50 px-3.5 py-1.5 rounded-xl font-bold cursor-pointer shadow-md transition-all text-xs"
+              title={`বাথুয়ারী গ্রাম পঞ্চায়েত গুগল স্প্রেডশীট লাইভ সংযুক্ত। অটো-সিঙ্ক সক্রিয়।`}
             >
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+              </span>
               <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-300" />
               <span className="hidden sm:inline">
-                স্থায়ী শিট লিঙ্কড (LIVE)
+                লাইভ শিট অটো-সিঙ্ক
               </span>
               <span className="sm:hidden">
-                LINKED
+                LIVE
               </span>
             </button>
 
