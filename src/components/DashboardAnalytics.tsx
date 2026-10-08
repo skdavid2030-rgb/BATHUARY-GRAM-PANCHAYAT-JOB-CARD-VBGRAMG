@@ -121,39 +121,39 @@ export const DashboardAnalytics: React.FC<DashboardProps> = ({
   return (
     <div className="space-y-6">
 
-      {/* Top Banner with Sansad Selector */}
-      <div className="rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 sm:p-8 shadow-xl border border-indigo-900/50 relative overflow-hidden">
-        <div className="h-2 w-full bg-gradient-to-r from-orange-500 via-amber-400 via-emerald-400 to-teal-400 absolute top-0 left-0" />
+      {/* Top Banner with Sansad Selector (Compact Height & Deep Garua) */}
+      <div className="rounded-2xl bg-gradient-to-r from-[#601704] via-[#481102] to-[#260700] text-white p-3.5 sm:p-4 px-4 sm:px-5 shadow-xl border-2 border-amber-600/70 relative overflow-hidden">
+        <div className="h-1.5 w-full bg-gradient-to-r from-amber-500 via-orange-500 to-emerald-400 absolute top-0 left-0" />
         
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 relative z-10">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs font-black mb-2.5 shadow-xs">
-              <Building className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-[11px] font-black mb-1 shadow-2xs">
+              <Building className="w-3 h-3 text-emerald-400 animate-pulse" />
               <span>Bathuary Gram Panchayat • Egra-II Development Block • Purba Medinipur</span>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-3">
+            <h2 className="text-lg sm:text-xl font-black text-white tracking-tight flex items-center gap-2">
               <span>Job Card & e-KYC Analytics Dashboard</span>
-              <span className="relative flex h-3.5 w-3.5">
+              <span className="relative flex h-2.5 w-2.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
               </span>
             </h2>
-            <p className="text-slate-300 text-xs sm:text-sm mt-1.5 max-w-2xl leading-relaxed font-medium">
+            <p className="text-amber-100/80 text-[11px] sm:text-xs mt-0.5 max-w-2xl font-medium leading-normal">
               Real-time monitoring of Aadhaar seeding, biometric e-KYC progress, and ABPS payment compliance across all 29 villages and 16 Sansads (BATHUARY 1 to BATHUARY 16).
             </p>
           </div>
 
           {/* Action Area: Sansad Filter Dropdown (Strictly BATHUARY 1..16) */}
-          <div className="flex items-center gap-3 self-start lg:self-auto">
-            <div className="flex items-center gap-2.5 bg-white/10 backdrop-blur-md p-2.5 rounded-2xl border border-white/20 shadow-lg">
-              <label className="text-xs font-black text-emerald-300 flex items-center gap-1.5 whitespace-nowrap pl-1">
-                <Filter className="w-4 h-4 text-emerald-400" />
+          <div className="flex items-center gap-2 self-start lg:self-center shrink-0">
+            <div className="flex items-center gap-2 bg-black/35 backdrop-blur-md px-3 py-1.5 rounded-xl border border-amber-500/40 shadow-md">
+              <label className="text-[11px] font-black text-amber-300 flex items-center gap-1.5 whitespace-nowrap pl-0.5">
+                <Filter className="w-3.5 h-3.5 text-amber-400" />
                 <span>Sansad Filter:</span>
               </label>
               <select
                 value={selectedSansad}
                 onChange={(e) => onSansadChange(e.target.value)}
-                className="bg-slate-900 text-white text-xs sm:text-sm font-black rounded-xl px-3.5 py-2 border border-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-400 transition-all cursor-pointer min-w-[190px] shadow-xs"
+                className="bg-[#300A01] text-amber-100 text-xs font-black rounded-lg px-2.5 py-1 border border-amber-600/60 focus:outline-none focus:ring-2 focus:ring-amber-400 transition-all cursor-pointer min-w-[170px] shadow-2xs"
               >
                 <option value="ALL">-- ALL 16 SANSADS --</option>
                 {sansadList.map(s => (
@@ -164,23 +164,23 @@ export const DashboardAnalytics: React.FC<DashboardProps> = ({
           </div>
         </div>
 
-        {/* Dynamic Mini Ribbon */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-5 border-t border-white/10 text-xs">
-          <div className="bg-white/5 backdrop-blur-xs p-2.5 rounded-xl border border-white/10">
-            <span className="text-[10px] font-bold text-slate-400 uppercase block">Active Sansad</span>
-            <span className="text-sm font-black text-emerald-300 font-mono">{selectedSansad}</span>
+        {/* Dynamic Mini Ribbon (Compact & Sleek) */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2.5 pt-2.5 border-t border-amber-700/50 text-xs">
+          <div className="bg-black/25 backdrop-blur-xs px-2.5 py-1.5 rounded-lg border border-amber-700/40 flex items-center justify-between">
+            <span className="text-[10px] font-bold text-amber-200/80 uppercase">Active Sansad</span>
+            <span className="text-xs font-black text-emerald-300 font-mono">{selectedSansad}</span>
           </div>
-          <div className="bg-white/5 backdrop-blur-xs p-2.5 rounded-xl border border-white/10">
-            <span className="text-[10px] font-bold text-slate-400 uppercase block">Completion Rate</span>
-            <span className="text-sm font-black text-teal-300 font-mono">{analytics.donePct}% Verified</span>
+          <div className="bg-black/25 backdrop-blur-xs px-2.5 py-1.5 rounded-lg border border-amber-700/40 flex items-center justify-between">
+            <span className="text-[10px] font-bold text-amber-200/80 uppercase">Completion Rate</span>
+            <span className="text-xs font-black text-teal-300 font-mono">{analytics.donePct}% Verified</span>
           </div>
-          <div className="bg-white/5 backdrop-blur-xs p-2.5 rounded-xl border border-white/10">
-            <span className="text-[10px] font-bold text-slate-400 uppercase block">Villages Count</span>
-            <span className="text-sm font-black text-indigo-300 font-mono">29 Mouzas</span>
+          <div className="bg-black/25 backdrop-blur-xs px-2.5 py-1.5 rounded-lg border border-amber-700/40 flex items-center justify-between">
+            <span className="text-[10px] font-bold text-amber-200/80 uppercase">Villages Count</span>
+            <span className="text-xs font-black text-amber-300 font-mono">29 Mouzas</span>
           </div>
-          <div className="bg-white/5 backdrop-blur-xs p-2.5 rounded-xl border border-white/10">
-            <span className="text-[10px] font-bold text-slate-400 uppercase block">Total Beneficiaries</span>
-            <span className="text-sm font-black text-amber-300 font-mono">{analytics.total} Records</span>
+          <div className="bg-black/25 backdrop-blur-xs px-2.5 py-1.5 rounded-lg border border-amber-700/40 flex items-center justify-between">
+            <span className="text-[10px] font-bold text-amber-200/80 uppercase">Total Beneficiaries</span>
+            <span className="text-xs font-black text-orange-300 font-mono">{analytics.total} Records</span>
           </div>
         </div>
       </div>
@@ -561,10 +561,10 @@ export const DashboardAnalytics: React.FC<DashboardProps> = ({
 
       {/* Quick View Drill-down Modal for Total Job Card */}
       {showUniqueCardsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/75 backdrop-blur-xs animate-fadeIn">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-[#2A0C03]/75 backdrop-blur-xs animate-fadeIn">
           <div className="bg-white rounded-3xl border-2 border-purple-500 shadow-2xl max-w-5xl w-full max-h-[90vh] flex flex-col overflow-hidden">
             {/* Header */}
-            <div className="bg-gradient-to-r from-purple-700 via-indigo-700 to-slate-900 text-white p-5 flex items-center justify-between border-b border-purple-600">
+            <div className="bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-950 text-white p-5 flex items-center justify-between border-b border-purple-600">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center text-purple-200">
                   <Layers className="w-5 h-5" />
@@ -640,7 +640,7 @@ export const DashboardAnalytics: React.FC<DashboardProps> = ({
             {/* Table with the requested fields including Aadhaar */}
             <div className="overflow-auto flex-1 p-4">
               <table className="w-full text-left border-collapse text-xs">
-                <thead className="bg-slate-900 text-white sticky top-0 z-10 font-sans">
+                <thead className="bg-gradient-to-r from-[#7C2D12] to-[#9A3412] text-white sticky top-0 z-10 font-sans">
                   <tr>
                     <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 w-14 text-center">Sl No</th>
                     <th className="p-2.5 sm:p-3 text-[10px] font-black uppercase tracking-wider border-r border-slate-800 w-28">Sansad Name & No</th>
@@ -699,7 +699,7 @@ export const DashboardAnalytics: React.FC<DashboardProps> = ({
               <button
                 type="button"
                 onClick={() => setShowUniqueCardsModal(false)}
-                className="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white font-black text-xs rounded-xl cursor-pointer"
+                className="px-5 py-2 bg-gradient-to-r from-[#7C2D12] to-[#9A3412] hover:from-[#9A3412] hover:to-[#C2410C] text-white font-black text-xs rounded-xl cursor-pointer shadow-xs"
               >
                 Close
               </button>

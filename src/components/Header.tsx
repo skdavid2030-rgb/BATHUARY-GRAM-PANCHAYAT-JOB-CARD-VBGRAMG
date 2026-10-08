@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 import { NationalEmblemLogo, VbGramGActLogo } from './Emblems';
 import { AppUser } from '../types';
+import { LanguageSwitch } from './LanguageSwitch';
+import { AppLanguage, I18N_STRINGS } from '../utils/i18n';
 
 interface HeaderProps {
   currentTab: string;
@@ -34,6 +36,8 @@ interface HeaderProps {
   currentUser?: AppUser;
   onLogout?: () => void;
   lastSyncTime?: string;
+  language?: AppLanguage;
+  onLanguageChange?: (lang: AppLanguage) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -46,44 +50,85 @@ export const Header: React.FC<HeaderProps> = ({
   isPermanentlySaved,
   currentUser,
   onLogout,
-  lastSyncTime
+  lastSyncTime,
+  language = 'bn',
+  onLanguageChange = () => {}
 }) => {
   // Live Clock & Date state
   const [currentTime, setCurrentTime] = useState<string>('');
   const [currentDate, setCurrentDate] = useState<string>('');
+  const isBn = language === 'bn';
 
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
-      setCurrentTime(now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }));
-      setCurrentDate(now.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }));
+      setCurrentTime(now.toLocaleTimeString(isBn ? 'bn-IN' : 'en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }));
+      setCurrentDate(now.toLocaleDateString(isBn ? 'bn-IN' : 'en-IN', { day: '2-digit', month: 'short', year: 'numeric' }));
     };
     updateTime();
     const interval = setInterval(updateTime, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isBn]);
 
-  // English title & badge color based on active tab
+  // Dynamic bilingual title & badge color based on active tab
   const getTabConfig = (tab: string) => {
     switch (tab) {
+      case 'home':
+        return {
+          title: isBn ? 'হোম সারসংক্ষেপ ও পঞ্চায়েত হাব' : 'Home Overview & Panchayat Hub',
+          icon: Home,
+          color: 'text-amber-700 bg-amber-50 border-amber-300'
+        };
       case 'dashboard': 
-        return { title: 'Dashboard & Analytics (29 Villages & 16 Sansads)', icon: BarChart3, color: 'text-amber-600 bg-amber-50 border-amber-200' };
+        return { 
+          title: isBn ? 'ড্যাশবোর্ড ও অ্যানালিটিক্স (২৯টি গ্রাম ও ১৬টি সংসদ)' : 'Dashboard & Analytics (29 Villages & 16 Sansads)', 
+          icon: BarChart3, 
+          color: 'text-amber-600 bg-amber-50 border-amber-200' 
+        };
       case 'search': 
-        return { title: 'Citizen Search Corner', icon: Search, color: 'text-blue-600 bg-blue-50 border-blue-200' };
+        return { 
+          title: isBn ? 'নাগরিক অনুসন্ধান কর্নার (জব কার্ড ও আধার)' : 'Citizen Search Corner (Job Card & Aadhaar)', 
+          icon: Search, 
+          color: 'text-blue-600 bg-blue-50 border-blue-200' 
+        };
       case 'dataForm': 
-        return { title: 'Data Update Form', icon: UserCheck, color: 'text-teal-600 bg-teal-50 border-teal-200' };
+        return { 
+          title: isBn ? 'ডাটা আপডেট ফর্ম (ফিল্ড অফিসার e-KYC)' : 'Data Update Form (Field Officer e-KYC)', 
+          icon: UserCheck, 
+          color: 'text-teal-600 bg-teal-50 border-teal-200' 
+        };
       case 'reports': 
-        return { title: 'Village Report & PDF Generator', icon: FileText, color: 'text-indigo-600 bg-indigo-50 border-indigo-200' };
+        return { 
+          title: isBn ? 'গ্রাম রিপোর্ট ও অফিসিয়াল PDF জেনারেটর' : 'Village Report & PDF Generator', 
+          icon: FileText, 
+          color: 'text-indigo-600 bg-indigo-50 border-indigo-200' 
+        };
       case 'ai': 
-        return { title: 'AI Verifier & Assistant', icon: Bot, color: 'text-fuchsia-600 bg-fuchsia-50 border-fuchsia-200' };
+        return { 
+          title: isBn ? 'AI ভেরিফায়ার ও সহায়তা সহকারী' : 'AI Verifier & Assistant', 
+          icon: Bot, 
+          color: 'text-fuchsia-600 bg-fuchsia-50 border-fuchsia-200' 
+        };
       case 'deploy': 
       case 'deployment': 
-        return { title: 'Deployment & Hosting Guide', icon: Rocket, color: 'text-rose-600 bg-rose-50 border-rose-200' };
+        return { 
+          title: isBn ? 'ডেপ্লয়মেন্ট ও হোস্টিং গাইড' : 'Deployment & Hosting Guide', 
+          icon: Rocket, 
+          color: 'text-rose-600 bg-rose-50 border-rose-200' 
+        };
       case 'security': 
       case 'policy': 
-        return { title: 'Security & Privacy Policy', icon: ShieldCheck, color: 'text-purple-600 bg-purple-50 border-purple-200' };
+        return { 
+          title: isBn ? 'নিরাপত্তা ও গোপনীয়তা নীতি' : 'Security & Privacy Policy', 
+          icon: ShieldCheck, 
+          color: 'text-purple-600 bg-purple-50 border-purple-200' 
+        };
       default: 
-        return { title: 'Bathuary Gram Panchayat Portal', icon: Sparkles, color: 'text-emerald-600 bg-emerald-50 border-emerald-200' };
+        return { 
+          title: isBn ? 'বাথুয়ারী গ্রাম পঞ্চায়েত পোর্টাল' : 'Bathuary Gram Panchayat Portal', 
+          icon: Sparkles, 
+          color: 'text-emerald-600 bg-emerald-50 border-emerald-200' 
+        };
     }
   };
 
@@ -95,28 +140,28 @@ export const Header: React.FC<HeaderProps> = ({
       {/* Top Colorful Animated Shimmer Strip */}
       <div className="h-1 w-full bg-gradient-to-r from-emerald-400 via-teal-400 via-sky-400 via-indigo-500 via-purple-500 via-pink-500 to-amber-400 animate-gradient-shift" />
 
-      {/* Top Deep Blue Government Banner */}
-      <div className="bg-gradient-to-r from-[#070D1E] via-[#0B132B] to-[#141E3C] px-4 sm:px-6 py-2.5 text-xs text-slate-200 border-b border-slate-800 relative overflow-hidden">
+      {/* Top Rich Garua Government Banner */}
+      <div className="bg-gradient-to-r from-[#7C2D12] via-[#9A3412] to-[#78350F] px-4 sm:px-6 py-2.5 text-xs text-amber-50 border-b border-amber-800/80 relative overflow-hidden">
         {/* Ambient background glows */}
-        <div className="absolute -top-6 -left-6 w-32 h-32 bg-emerald-500/15 rounded-full blur-2xl pointer-events-none" />
-        <div className="absolute -bottom-6 right-1/4 w-40 h-40 bg-indigo-500/15 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute -top-6 -left-6 w-32 h-32 bg-amber-400/15 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute -bottom-6 right-1/4 w-40 h-40 bg-orange-400/15 rounded-full blur-2xl pointer-events-none" />
 
         <div className="relative z-10 flex flex-wrap justify-between items-center gap-2">
-          {/* Left Brand Identifier with Official Logos (Logo 1 & Logo 2) */}
+          {/* Left Brand Identifier with Official Logos: Ashoka Emblem, Bathuary Round Seal, VB-GRAM G Act */}
           <div className="flex items-center gap-3">
             {/* Mobile Hamburger Toggle for Left Sidebar */}
             <button
               id="mobile-sidebar-toggle-btn"
               onClick={onOpenSidebar}
-              className="lg:hidden p-1.5 rounded-xl bg-slate-800/90 hover:bg-emerald-600 text-emerald-400 hover:text-white transition-all cursor-pointer shadow-xs"
+              className="lg:hidden p-1.5 rounded-xl bg-amber-950/80 hover:bg-orange-600 text-amber-200 hover:text-white transition-all cursor-pointer shadow-xs"
               title="Open Navigation Menu"
               aria-label="Toggle navigation menu"
             >
               <Menu className="w-5 h-5" />
             </button>
 
-            {/* Official Logos: State Emblem of India (Logo 1) & VB-GRAM G Act (Logo 2) */}
-            <div className="flex items-center gap-2.5">
+            {/* Official Logos Trio */}
+            <div className="flex items-center gap-2">
               <div className="p-1 bg-white rounded-xl shadow-md border border-slate-200/80 transition-transform hover:scale-105">
                 <NationalEmblemLogo className="w-5 h-7 text-slate-900 drop-shadow-xs" />
               </div>
@@ -124,42 +169,49 @@ export const Header: React.FC<HeaderProps> = ({
                 <VbGramGActLogo className="w-12 h-7 drop-shadow-xs" />
               </div>
 
-              <div className="flex flex-col justify-center">
+              <div className="flex flex-col justify-center ml-1">
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs sm:text-sm font-black text-white tracking-wide uppercase leading-tight">
-                    Govt. of West Bengal
+                    {isBn ? 'পশ্চিমবঙ্গ সরকার' : 'Govt. of West Bengal'}
                   </span>
                   <span className="hidden sm:inline-block px-1.5 py-0.2 rounded bg-gradient-to-r from-emerald-500/30 to-teal-500/30 border border-emerald-400/40 text-[9px] font-bold text-emerald-300">
-                    Live Portal
+                    {isBn ? 'লাইভ পোর্টাল' : 'Live Portal'}
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-bold text-emerald-400 leading-tight mt-0.5">
-                  <span>Panchayats & Rural Development</span>
-                  <span className="text-slate-400 hidden sm:inline">• Bathuary Gram Panchayat, Egra-II Development Block</span>
+                  <span>{isBn ? 'পঞ্চায়েত ও গ্রামোন্নয়ন' : 'Panchayats & Rural Development'}</span>
+                  <span className="text-slate-400 hidden sm:inline">• {isBn ? 'বাথুয়ারী গ্রাম পঞ্চায়েত, এগ্রা-২' : 'Bathuary Gram Panchayat, Egra-II Block'}</span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Right Action Bar (Enhanced 3D Buttons & Realtime Clock) */}
-          <div className="flex items-center gap-2 sm:gap-3 text-[11px]">
+          {/* Right Action Bar (Language Switcher, 3D Sync Buttons & Realtime Clock) */}
+          <div className="flex items-center gap-2 sm:gap-2.5 text-[11px]">
+            {/* Dual Language Switcher Button (BN / EN) */}
+            <LanguageSwitch
+              language={language}
+              onLanguageChange={onLanguageChange}
+              variant="header"
+            />
+
             {/* Live Real-time Clock Badge */}
-            <div className="hidden xl:flex items-center gap-2 bg-slate-900/90 border border-slate-700/80 px-3 py-1.5 rounded-xl shadow-inner text-slate-300">
+            <div className="hidden xl:flex items-center gap-2 bg-[#421505]/90 border border-amber-700/80 px-3 py-1.5 rounded-xl shadow-inner text-amber-100">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
               </span>
               <Clock className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="font-mono font-bold text-emerald-300 text-xs">{currentTime || "Live"}</span>
-              <span className="text-slate-500">|</span>
-              <span className="text-[10px] text-slate-400 font-medium">{currentDate}</span>
+              <span className="font-mono font-bold text-amber-200 text-xs">{currentTime || "Live"}</span>
+              <span className="text-amber-600">|</span>
+              <span className="text-[10px] text-amber-200/90 font-medium">{currentDate}</span>
             </div>
 
             <button
               id="header-link-sheet-btn"
               onClick={onOpenSyncModal}
-              className="flex items-center gap-1.5 text-white bg-emerald-800/90 hover:bg-emerald-700 border border-emerald-500/50 px-3.5 py-1.5 rounded-xl font-bold cursor-pointer shadow-md transition-all text-xs"
-              title={`বাথুয়ারী গ্রাম পঞ্চায়েত গুগল স্প্রেডশীট লাইভ সংযুক্ত। অটো-সিঙ্ক সক্রিয়।`}
+              className="flex items-center gap-1.5 text-white bg-emerald-800/90 hover:bg-emerald-700 border border-emerald-500/50 px-3 py-1.5 rounded-xl font-bold cursor-pointer shadow-md transition-all text-xs"
+              title={isBn ? 'বাথুয়ারী গ্রাম পঞ্চায়েত গুগল স্প্রেডশীট লাইভ সংযুক্ত। অটো-সিঙ্ক সক্রিয়।' : 'Bathuary Gram Panchayat Google Sheet Live Connected'}
             >
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -167,7 +219,7 @@ export const Header: React.FC<HeaderProps> = ({
               </span>
               <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-300" />
               <span className="hidden sm:inline">
-                লাইভ শিট অটো-সিঙ্ক
+                {isBn ? 'লাইভ শিট' : 'Live Sheet'}
               </span>
               <span className="sm:hidden">
                 LIVE
@@ -182,19 +234,19 @@ export const Header: React.FC<HeaderProps> = ({
               title="Refresh and re-synchronize records"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-amber-200' : ''}`} />
-              <span className="hidden sm:inline">{isSyncing ? "SYNCING..." : "SYNC"}</span>
+              <span className="hidden sm:inline">{isSyncing ? (isBn ? "সিঙ্ক হচ্ছে..." : "SYNCING...") : (isBn ? "সিঙ্ক" : "SYNC")}</span>
             </button>
 
             {onLogout && (
               <button
                 id="header-logout-btn"
                 onClick={onLogout}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-rose-950/80 border border-slate-700 hover:border-rose-500/50 text-slate-300 hover:text-rose-200 font-bold text-xs transition-all shadow-md cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#431407]/90 hover:bg-[#5C1D0A] border border-amber-700/80 hover:border-amber-500 text-amber-100 hover:text-white font-bold text-xs transition-all shadow-md cursor-pointer"
                 title={`Logged in as ${currentUser?.name || 'BATHUARY_002'}. Click to logout.`}
               >
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse hidden sm:inline" />
                 <span className="font-mono text-emerald-300 text-[11px] hidden md:inline">{currentUser?.name || 'BATHUARY_002'}</span>
-                <span className="text-rose-400 hover:text-rose-200 text-xs font-semibold">Logout</span>
+                <span className="text-amber-200 hover:text-white text-xs font-semibold">{isBn ? 'লগআউট' : 'Logout'}</span>
               </button>
             )}
           </div>
@@ -207,9 +259,9 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Mobile Sidebar Trigger */}
           <button
             onClick={onOpenSidebar}
-            className="lg:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 text-white font-bold text-xs shadow-md cursor-pointer hover:bg-emerald-700 transition-colors"
+            className="lg:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#7C2D12] to-[#9A3412] text-amber-50 font-bold text-xs shadow-md cursor-pointer hover:from-[#9A3412] hover:to-[#C2410C] border border-amber-600/60 transition-colors"
           >
-            <Menu className="w-4 h-4 text-emerald-400" />
+            <Menu className="w-4 h-4 text-amber-200" />
             <span>Menu</span>
           </button>
 

@@ -8,15 +8,18 @@ interface CitizenSearchCornerProps {
   beneficiaries: BeneficiaryRow[];
   onPrintSlip: (row: BeneficiaryRow) => void;
   onPrintA5Slip: (row: BeneficiaryRow) => void;
+  language?: 'bn' | 'en';
 }
 
 export const CitizenSearchCorner: React.FC<CitizenSearchCornerProps> = ({
   beneficiaries,
   onPrintSlip,
-  onPrintA5Slip
+  onPrintA5Slip,
+  language = 'bn'
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showFullAadhaar, setShowFullAadhaar] = useState(true);
+  const isBn = language === 'bn';
 
   const trimmed = searchTerm.trim().toLowerCase();
   const digitsOnly = trimmed.replace(/\D/g, '');
@@ -35,11 +38,11 @@ export const CitizenSearchCorner: React.FC<CitizenSearchCornerProps> = ({
     : [];
 
   const quickFilterChips = [
-    { label: 'e-KYC Done', query: 'YES' },
-    { label: 'Pending e-KYC', query: 'NO' },
-    { label: 'Bathuary', query: 'BATHUARY' },
-    { label: 'Hatbaincha', query: 'HATBAINCHA' },
-    { label: 'Deceased/Death', query: 'DEATH' }
+    { label: isBn ? 'e-KYC সম্পন্ন' : 'e-KYC Done', query: 'YES' },
+    { label: isBn ? 'e-KYC বাকি' : 'Pending e-KYC', query: 'NO' },
+    { label: isBn ? 'বাথুয়ারী' : 'Bathuary', query: 'BATHUARY' },
+    { label: isBn ? 'হাটবাইঞ্চা' : 'Hatbaincha', query: 'HATBAINCHA' },
+    { label: isBn ? 'মৃত উপভোক্তা' : 'Deceased/Death', query: 'DEATH' }
   ];
 
   return (
@@ -53,21 +56,23 @@ export const CitizenSearchCorner: React.FC<CitizenSearchCornerProps> = ({
         <div className="relative z-10 max-w-2xl mx-auto space-y-3">
           <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-gradient-to-r from-blue-500/15 to-emerald-500/15 border border-blue-300/60 text-blue-800 text-xs font-black shadow-2xs">
             <IdCard className="w-4 h-4 text-blue-600 animate-pulse" />
-            <span>Official Citizen Search & Verification Corner</span>
+            <span>{isBn ? 'অফিসিয়াল নাগরিক তথ্য ও ভেরিফিকেশন অনুসন্ধান' : 'Official Citizen Search & Verification Corner'}</span>
           </div>
 
           <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-            Check Your Job Card & e-KYC Status
+            {isBn ? 'আপনার জব কার্ড ও e-KYC স্ট্যাটাস দেখুন' : 'Check Your Job Card & e-KYC Status'}
           </h2>
           <p className="text-xs sm:text-sm text-slate-600 font-medium">
-            Search using Job Card Number, Applicant Name, Head of Household, Aadhaar Number, or Village Name.
+            {isBn 
+              ? 'জব কার্ড নম্বর, উপভোক্তার নাম, পরিবারের প্রধান, আধার নম্বর বা গ্রামের নাম দিয়ে খুঁজুন।'
+              : 'Search using Job Card Number, Applicant Name, Head of Household, Aadhaar Number, or Village Name.'}
           </p>
 
           {/* Search Input Bar */}
           <div className="relative mt-4">
             <input
               type="text"
-              placeholder="Type Job Card (e.g. WB-16-003...), Name, Aadhaar or Village..."
+              placeholder={isBn ? 'জব কার্ড (যেমন WB-16-003...), নাম, আধার শেষ ৪ সংখ্যা বা গ্রাম...' : 'Type Job Card (e.g. WB-16-003...), Name, Aadhaar or Village...'}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full bg-white text-slate-900 text-sm sm:text-base font-semibold rounded-2xl pl-12 pr-10 py-3.5 border-2 border-slate-300 hover:border-blue-400 focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-600 shadow-sm transition-all"

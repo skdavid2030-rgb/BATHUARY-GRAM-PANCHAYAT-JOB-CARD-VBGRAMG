@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { DashboardAnalytics } from './components/DashboardAnalytics';
+import { HomeOverview } from './components/HomeOverview';
 import { DataUpdateForm } from './components/DataUpdateForm';
 import { CitizenSearchCorner } from './components/CitizenSearchCorner';
 import { VillagePdfReport } from './components/VillagePdfReport';
@@ -26,12 +27,22 @@ import { syncLiveGoogleSheet } from './utils/liveSheetSync';
 import { loadCachedBeneficiaries, saveCachedBeneficiaries } from './utils/beneficiaryStorage';
 import { NationalEmblemLogo, VbGramGActLogo } from './components/Emblems';
 import { FileSpreadsheet, AlertCircle, RefreshCw, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { AppLanguage } from './utils/i18n';
 
 export default function App() {
   // Navigation: Default directly to Dashboard Analytics
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
-  const language = 'en';
+  
+  // Dual Language State ('bn' | 'en') with persistent storage
+  const [language, setLanguage] = useState<AppLanguage>(() => {
+    return (safeStorage.getItem('bathuary_portal_lang') as AppLanguage) || 'bn';
+  });
+
+  const handleLanguageChange = (newLang: AppLanguage) => {
+    setLanguage(newLang);
+    safeStorage.setItem('bathuary_portal_lang', newLang);
+  };
 
   // Inactivity timeout: 15 minutes (900,000 ms)
   const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000;
@@ -561,6 +572,8 @@ export default function App() {
       <LoginPage 
         onLoginSuccess={handleLoginSuccess}
         beneficiaries={beneficiaries}
+        language={language}
+        onLanguageChange={handleLanguageChange}
       />
     );
   }
@@ -584,6 +597,8 @@ export default function App() {
           villagesCount: new Set(beneficiaries.map(b => b.colV)).size
         }}
         isPermanentlySaved={isSheetPermanentlySaved}
+        language={language}
+        onLanguageChange={handleLanguageChange}
       />
 
       {/* RIGHT MAIN WORKSPACE (Adjusted for left sidebar) */}
@@ -604,6 +619,8 @@ export default function App() {
           currentUser={currentUser}
           onLogout={handleLogout}
           lastSyncTime={lastSyncTimeString}
+          language={language}
+          onLanguageChange={handleLanguageChange}
         />
 
         {/* Real-time Google Sheet Auto-Sync Alert Toast */}
@@ -625,31 +642,45 @@ export default function App() {
           
           {/* AI Smart Auto-Sync Engine Notice (Displayed during initial data load) */}
           {beneficiaries.length === 0 && (
-            <div className="mb-6 p-5 sm:p-6 bg-gradient-to-r from-slate-900 via-emerald-950 to-slate-900 rounded-3xl text-white shadow-xl border border-emerald-500/30 no-print">
+            <div className="mb-6 p-4 sm:p-5 bg-gradient-to-r from-[#601704] via-[#481102] to-[#260700] rounded-2xl text-white shadow-xl border-2 border-amber-600/70 no-print">
               <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div className="space-y-1.5 max-w-2xl">
                   <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold border border-emerald-500/40">
                     <span className="relative flex h-2 w-2">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
                     </span>
                     <span>🤖 AI Smart Auto-Sync Engine • Bathuary GP</span>
                   </div>
                   <h3 className="text-xl font-black text-white flex items-center gap-2">
                     {isSyncing ? 'গুগল স্প্রেডশীট থেকে লাইভ তথ্য স্বয়ংক্রিয়ভাবে লোড হচ্ছে...' : 'লাইভ গুগল স্প্রেডশীট স্বয়ংক্রিয়ভাবে সংযুক্ত'}
                   </h3>
-                  <p className="text-xs text-slate-300 leading-relaxed">
+                  <p className="text-xs text-amber-100/80 leading-relaxed font-medium">
                     বাথুয়ারী গ্রাম পঞ্চায়েতের অফিসিয়াল গুগল শীট থেকে ডাটা সম্পূর্ণ স্বয়ংক্রিয়ভাবে সিঙ্ক হচ্ছে। কোনো ম্যানুয়াল বোতাম চাপার প্রয়োজন নেই।
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-emerald-400 font-mono bg-emerald-950/80 px-3 py-2 rounded-xl border border-emerald-500/40 flex items-center gap-2">
+                  <span className="text-xs text-emerald-400 font-mono bg-black/40 px-3 py-2 rounded-xl border border-emerald-500/40 flex items-center gap-2">
                     <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-amber-300' : 'text-emerald-400'}`} />
                     <span>{isSyncing ? 'AI Auto-Syncing...' : 'Auto-Sync Active'}</span>
                   </span>
                 </div>
               </div>
             </div>
+          )}
+
+          {/* TAB 0: Home Overview Hub */}
+          {currentTab === 'home' && (
+            <HomeOverview
+              analytics={analytics}
+              villageStats={villageStats}
+              onNavigateTab={(tab, extra) => {
+                setCurrentTab(tab);
+                if (extra?.sansad) setSelectedSansad(extra.sansad);
+              }}
+              onOpenSyncModal={() => setIsSyncModalOpen(true)}
+              language={language}
+            />
           )}
 
           {/* TAB 1: Dashboard Analytics */}
@@ -673,6 +704,7 @@ export default function App() {
               beneficiaries={beneficiaries}
               onPrintSlip={(row) => setPrintRow(row)}
               onPrintA5Slip={(row) => setPrintA5Row(row)}
+              language={language}
             />
           )}
 

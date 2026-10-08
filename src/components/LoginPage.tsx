@@ -22,6 +22,8 @@ import {
 import { NationalEmblemLogo, VbGramGActLogo, BathuaryGramPanchayatOfficialLogo } from './Emblems';
 import { BeneficiaryRow, AppUser } from '../types';
 import { safeStorage } from '../utils/safeStorage';
+import { LanguageSwitch } from './LanguageSwitch';
+import { I18N_STRINGS, AppLanguage } from '../utils/i18n';
 
 interface MetricsState {
   total: number;
@@ -49,12 +51,35 @@ const REAL_BATHUARY_METRICS: MetricsState = {
 interface LoginPageProps {
   onLoginSuccess: (user: AppUser) => void;
   beneficiaries: BeneficiaryRow[];
+  language?: AppLanguage;
+  onLanguageChange?: (lang: AppLanguage) => void;
 }
 
-export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, beneficiaries }) => {
-  // Login Form States
-  const [username, setUsername] = useState<string>('BATHUARY_002');
+export const LoginPage: React.FC<LoginPageProps> = ({ 
+  onLoginSuccess, 
+  beneficiaries, 
+  language = 'bn',
+  onLanguageChange 
+}) => {
+  // Dual Language State (BN / EN)
+  const [internalLang, setInternalLang] = useState<AppLanguage>(() => {
+    return (safeStorage.getItem('bathuary_portal_lang') as AppLanguage) || language || 'bn';
+  });
+  const currentLang = language || internalLang;
+  const t = I18N_STRINGS[currentLang];
+
+  const handleLanguageToggle = (lang: AppLanguage) => {
+    setInternalLang(lang);
+    safeStorage.setItem('bathuary_portal_lang', lang);
+    if (onLanguageChange) {
+      onLanguageChange(lang);
+    }
+  };
+
+  // Login Form States (Standard web login with Google Password Manager & Browser Keychain integration)
+  const [username, setUsername] = useState<string>(() => safeStorage.getItem('bathuary_saved_user') || '');
   const [password, setPassword] = useState<string>('');
+  const [rememberMe, setRememberMe] = useState<boolean>(() => !!safeStorage.getItem('bathuary_saved_user'));
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -203,7 +228,28 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, beneficiar
           window.sessionStorage?.removeItem('bathuary_logout_reason');
         }
 
-        setSuccessMessage('লগইন সফল হয়েছে! পোর্টালে প্রবেশ করা হচ্ছে... (Login Successful!)');
+        // Remember Me management
+        if (rememberMe) {
+          safeStorage.setItem('bathuary_saved_user', cleanUser);
+        } else {
+          safeStorage.removeItem('bathuary_saved_user');
+        }
+
+        // Browser & Google Password Manager Credential Management API Prompt
+        if (typeof window !== 'undefined' && 'PasswordCredential' in window && navigator.credentials) {
+          try {
+            const cred = new (window as any).PasswordCredential({
+              id: cleanUser,
+              password: cleanPass,
+              name: cleanUser
+            });
+            await navigator.credentials.store(cred);
+          } catch {
+            // Handled silently
+          }
+        }
+
+        setSuccessMessage(t.loginSuccessMsg || 'লগইন সফল হয়েছে! পোর্টালে প্রবেশ করা হচ্ছে...');
         setTimeout(() => {
           onLoginSuccess(appUser);
         }, 600);
@@ -228,12 +274,32 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, beneficiar
             window.sessionStorage?.setItem('bathuary_last_active', String(Date.now()));
             window.sessionStorage?.removeItem('bathuary_logout_reason');
           }
-          setSuccessMessage('লগইন সফল হয়েছে! (Login Successful!)');
+
+          if (rememberMe) {
+            safeStorage.setItem('bathuary_saved_user', cleanUser);
+          } else {
+            safeStorage.removeItem('bathuary_saved_user');
+          }
+
+          if (typeof window !== 'undefined' && 'PasswordCredential' in window && navigator.credentials) {
+            try {
+              const cred = new (window as any).PasswordCredential({
+                id: cleanUser,
+                password: cleanPass,
+                name: cleanUser
+              });
+              await navigator.credentials.store(cred);
+            } catch {
+              // Handled silently
+            }
+          }
+
+          setSuccessMessage(t.loginSuccessMsg || 'লগইন সফল হয়েছে!');
           setTimeout(() => {
             onLoginSuccess(appUser);
           }, 600);
         } else {
-          setErrorMessage(data.message || 'ভুল ইউজারনেম বা পাসওয়ার্ড! অনুগ্রহ করে সঠিক তথ্য দিন (Invalid Credentials).');
+          setErrorMessage(data.message || t.invalidCredentialsMsg || 'ভুল ইউজারনেম বা পাসওয়ার্ড! অনুগ্রহ করে সঠিক তথ্য দিন।');
         }
       }
     } catch {
@@ -257,12 +323,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, beneficiar
           window.sessionStorage?.setItem('bathuary_last_active', String(Date.now()));
           window.sessionStorage?.removeItem('bathuary_logout_reason');
         }
-        setSuccessMessage('লগইন সফল হয়েছে! (Offline Mode)');
+
+        if (rememberMe) {
+          safeStorage.setItem('bathuary_saved_user', cleanUser);
+        } else {
+          safeStorage.removeItem('bathuary_saved_user');
+        }
+
+        setSuccessMessage(t.loginSuccessMsg || 'লগইন সফল হয়েছে! (Offline Mode)');
         setTimeout(() => {
           onLoginSuccess(appUser);
         }, 600);
       } else {
-        setErrorMessage('ভুল ইউজারনেম বা পাসওয়ার্ড! (Invalid Username or Password)');
+        setErrorMessage(t.invalidCredentialsMsg || 'ভুল ইউজারনেম বা পাসওয়ার্ড!');
       }
     } finally {
       setIsLoading(false);
@@ -377,7 +450,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, beneficiar
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <NationalEmblemLogo size={42} />
-            <BathuaryGramPanchayatOfficialLogo size={42} className="hidden sm:inline-block" />
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-xs sm:text-sm font-black text-slate-900 tracking-wide uppercase">
@@ -560,31 +632,34 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, beneficiar
               </div>
             )}
 
-            {/* Official Header with Dual Logos */}
+            {/* Language Switcher & Official Header */}
+            <div className="flex justify-end mb-3">
+              <LanguageSwitch
+                language={currentLang}
+                onLanguageChange={handleLanguageToggle}
+                variant="login"
+              />
+            </div>
+
+            {/* Official Header with Round Panchayat Seal */}
             <div className="flex flex-col items-center text-center mb-6">
-              <div className="flex items-center justify-center gap-3.5 mb-3">
-                <div className="p-1 bg-white border border-amber-200 rounded-xl shadow-xs">
-                  <NationalEmblemLogo size={36} className="text-slate-800" />
-                </div>
-                <div className="p-1 bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-orange-300 rounded-2xl shadow-sm">
-                  <BathuaryGramPanchayatOfficialLogo size={58} />
-                </div>
-                <div className="p-1 bg-white border border-amber-200 rounded-xl shadow-xs">
-                  <VbGramGActLogo size={46} />
+              <div className="flex items-center justify-center mb-3">
+                <div className="p-2 bg-gradient-to-br from-amber-50 via-white to-orange-50 border-2 border-orange-400 rounded-full shadow-lg hover:scale-105 transition-transform">
+                  <BathuaryGramPanchayatOfficialLogo size={76} />
                 </div>
               </div>
 
               <h1 className="text-xl sm:text-2xl font-black text-slate-950 tracking-tight">
-                অফিসিয়াল অ্যাডমিন লগইন
+                {t.loginTitle}
               </h1>
               <p className="text-xs text-orange-700 font-black mt-1 tracking-wider uppercase">
-                BATHUARY GRAM PANCHAYAT OFFICIAL GATEWAY
+                {t.loginGateway}
               </p>
               <p className="text-xs text-slate-600 mt-1 max-w-sm font-medium">
-                বাথুয়ারী গ্রাম পঞ্চায়েত • ১২৫ দিনের কাজ ও আধার e-KYC প্রশাসন পোর্টাল
+                {t.loginSubtitle}
               </p>
               <div className="text-[11px] text-amber-900 font-semibold mt-0.5">
-                Egra-II Development Block • Purba Medinipur
+                {currentLang === 'bn' ? 'এগ্রা-২ উন্নয়ন ব্লক • পূর্ব মেদিনীপুর' : 'Egra-II Development Block • Purba Medinipur'}
               </div>
             </div>
 
@@ -603,44 +678,50 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, beneficiar
               </div>
             )}
 
-            {/* Login Form */}
-            <form onSubmit={handleLogin} className="space-y-4">
+            {/* Standard Web Login Form with Browser & Google Password Manager Autocomplete */}
+            <form 
+              method="POST"
+              action="#"
+              onSubmit={handleLogin} 
+              autoComplete="on"
+              className="space-y-4"
+            >
               {/* Username Field */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  অফিসিয়াল ইউজার আইডি (Username)
+                <label 
+                  htmlFor="username"
+                  className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5"
+                >
+                  {t.usernameLabel}
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                     <UserCheck className="w-4 h-4 text-orange-600" />
                   </div>
                   <input
-                    id="login-username-input"
+                    id="username"
+                    name="username"
                     type="text"
                     required
+                    autoComplete="username"
+                    autoCapitalize="none"
+                    spellCheck={false}
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    placeholder="BATHUARY_002"
+                    placeholder={t.usernamePlaceholder}
                     className="w-full pl-10 pr-4 py-3 bg-orange-50/40 border border-orange-200 rounded-xl text-slate-900 font-mono font-bold text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 focus:bg-white shadow-xs uppercase tracking-wider transition-all"
                   />
-                </div>
-                <div className="flex items-center justify-between text-[11px] text-slate-600 mt-1">
-                  <span>Official Authorized ID: <strong className="text-orange-700">BATHUARY_002</strong></span>
-                  <button
-                    type="button"
-                    onClick={() => setUsername('BATHUARY_002')}
-                    className="text-[10px] text-orange-700 hover:text-orange-900 underline font-bold cursor-pointer"
-                  >
-                    Auto-Fill
-                  </button>
                 </div>
               </div>
 
               {/* Password Field */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    পাসওয়ার্ড (Password)
+                  <label 
+                    htmlFor="password"
+                    className="block text-xs font-bold text-slate-700 uppercase tracking-wider"
+                  >
+                    {t.passwordLabel}
                   </label>
                   <button
                     type="button"
@@ -648,7 +729,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, beneficiar
                     className="text-[11px] text-orange-700 hover:text-orange-900 font-bold flex items-center gap-1 cursor-pointer transition-colors"
                   >
                     <KeyRound className="w-3 h-3" />
-                    পাসওয়ার্ড পরিবর্তন? (Change Password)
+                    {t.changePasswordLink}
                   </button>
                 </div>
                 <div className="relative">
@@ -656,9 +737,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, beneficiar
                     <Lock className="w-4 h-4 text-orange-600" />
                   </div>
                   <input
-                    id="login-password-input"
+                    id="password"
+                    name="password"
                     type={showPassword ? 'text' : 'password'}
                     required
+                    autoComplete="current-password"
+                    spellCheck={false}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••••••"
@@ -668,20 +752,28 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, beneficiar
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-500 hover:text-slate-800 cursor-pointer transition-colors"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-                <div className="flex items-center justify-between text-[11px] text-slate-600 mt-1">
-                  <span>Official Authorized Password: <strong className="text-orange-700 font-mono">Bathuary@2580</strong></span>
-                  <button
-                    type="button"
-                    onClick={() => setPassword('Bathuary@2580')}
-                    className="text-[10px] text-orange-700 hover:text-orange-900 underline font-bold cursor-pointer"
-                  >
-                    Auto-Fill
-                  </button>
-                </div>
+              </div>
+
+              {/* Remember Me Checkbox */}
+              <div className="flex items-center justify-between pt-1">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    id="remember"
+                    name="remember"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="w-4 h-4 rounded text-orange-600 focus:ring-orange-500 border-orange-300 cursor-pointer accent-orange-600"
+                  />
+                  <span className="text-xs font-semibold text-slate-700">
+                    {t.rememberMe}
+                  </span>
+                </label>
               </div>
 
               {/* Submit Button */}
@@ -694,11 +786,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, beneficiar
                 {isLoading ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin text-white" />
-                    <span>যাচাই করা হচ্ছে (Verifying)...</span>
+                    <span>{t.loginVerifying}</span>
                   </>
                 ) : (
                   <>
-                    <span>পোর্টালে লগইন করুন • LOGIN TO PORTAL</span>
+                    <span>{t.loginSubmit}</span>
                     <ArrowRight className="w-4 h-4 text-white" />
                   </>
                 )}

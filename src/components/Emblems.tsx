@@ -292,7 +292,7 @@ export const VbGramGActLogo: React.FC<EmblemProps> = ({ className = "w-28 h-16",
   );
 };
 
-// Official Circular Seal of Bathuary Gram Panchayat
+// Official Prestigious Circular Seal of Bathuary Gram Panchayat
 export const BathuaryGramPanchayatOfficialLogo: React.FC<EmblemProps> = ({ className = "w-16 h-16", size }) => {
   return (
     <svg 
@@ -302,117 +302,253 @@ export const BathuaryGramPanchayatOfficialLogo: React.FC<EmblemProps> = ({ class
       fill="none" 
       xmlns="http://www.w3.org/2000/svg"
       role="img"
-      aria-label="Bathuary Gram Panchayat Official Seal"
+      aria-label="বাথুয়ারী গ্রাম পঞ্চায়েত অফিসিয়াল গোল সিলমোহর - Official Bathuary Gram Panchayat Seal"
     >
-      <title>Bathuary Gram Panchayat Official Seal</title>
+      <title>বাথুয়ারী গ্রাম পঞ্চায়েত অফিসিয়াল সিলমোহর (Bathuary Gram Panchayat Official Seal)</title>
       <defs>
-        <linearGradient id="sealSaffron" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#EA580C" />
+        {/* Metallic Gold Gradients */}
+        <linearGradient id="bseal_gold_outer" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#FFF275" />
+          <stop offset="25%" stopColor="#F59E0B" />
+          <stop offset="50%" stopColor="#D97706" />
+          <stop offset="75%" stopColor="#FDE68A" />
+          <stop offset="100%" stopColor="#92400E" />
+        </linearGradient>
+
+        <linearGradient id="bseal_gold_inner" x1="0%" y1="100%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="#B45309" />
+          <stop offset="35%" stopColor="#F59E0B" />
+          <stop offset="70%" stopColor="#FEF08A" />
+          <stop offset="100%" stopColor="#D97706" />
+        </linearGradient>
+
+        {/* Deep Royal Navy Ring Gradient */}
+        <linearGradient id="bseal_navy" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#0B1A3F" />
+          <stop offset="50%" stopColor="#081432" />
+          <stop offset="100%" stopColor="#050C22" />
+        </linearGradient>
+
+        {/* Tricolor Ribbon Gradient */}
+        <linearGradient id="bseal_saffron_ribbon" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="#C2410C" />
+          <stop offset="25%" stopColor="#EA580C" />
           <stop offset="50%" stopColor="#F97316" />
+          <stop offset="75%" stopColor="#EA580C" />
           <stop offset="100%" stopColor="#C2410C" />
         </linearGradient>
-        <linearGradient id="sealGold" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#FDE68A" />
-          <stop offset="50%" stopColor="#F59E0B" />
-          <stop offset="100%" stopColor="#B45309" />
-        </linearGradient>
-        <linearGradient id="sealGreen" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#15803D" />
-          <stop offset="100%" stopColor="#166534" />
+
+        {/* Center Sunburst Radial Gradient */}
+        <radialGradient id="bseal_sunburst" cx="50%" cy="48%" r="50%">
+          <stop offset="0%" stopColor="#FFFFFF" />
+          <stop offset="40%" stopColor="#FFFBEB" />
+          <stop offset="85%" stopColor="#FEF3C7" />
+          <stop offset="100%" stopColor="#FDE68A" />
+        </radialGradient>
+
+        {/* Specular Glaze */}
+        <linearGradient id="bseal_glass" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.35" />
+          <stop offset="60%" stopColor="#FFFFFF" stopOpacity="0.03" />
+          <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
         </linearGradient>
       </defs>
 
-      {/* Outer Golden/Saffron Ring */}
-      <circle cx="100" cy="100" r="96" fill="#FFFDF8" stroke="url(#sealSaffron)" strokeWidth="6" />
-      <circle cx="100" cy="100" r="91" fill="none" stroke="#D97706" strokeWidth="1.5" strokeDasharray="3 3" />
-      <circle cx="100" cy="100" r="70" fill="#FFF7ED" stroke="url(#sealSaffron)" strokeWidth="3" />
+      {/* 1. Outer Deep Shadow / Rim */}
+      <circle cx="100" cy="100" r="98" fill="#78350F" opacity="0.15" />
 
-      {/* Curved Text Path: Top (Bengali) */}
-      <path id="topTextArc" d="M 28 100 A 72 72 0 0 1 172 100" fill="none" />
-      <text fill="#7C2D12" fontSize="11" fontWeight="900" letterSpacing="0.8">
-        <textPath href="#topTextArc" startOffset="50%" textAnchor="middle">
+      {/* 2. Outer Beaded Rim with Embossed Golden Studs */}
+      <circle cx="100" cy="100" r="97" fill="url(#bseal_gold_outer)" stroke="#78350F" strokeWidth="1" />
+      <circle cx="100" cy="100" r="93" fill="#92400E" />
+
+      {/* 36 Golden Pearl Studs around the rim */}
+      {[...Array(36)].map((_, i) => {
+        const angle = (i * 360) / 36;
+        const rad = (angle * Math.PI) / 180;
+        const cx = 100 + 95 * Math.cos(rad);
+        const cy = 100 + 95 * Math.sin(rad);
+        return (
+          <circle 
+            key={i} 
+            cx={cx.toFixed(1)} 
+            cy={cy.toFixed(1)} 
+            r="1.7" 
+            fill="#FFFDE7" 
+            stroke="#92400E" 
+            strokeWidth="0.5" 
+          />
+        );
+      })}
+
+      {/* 3. Outer Polished Gold Border Ring */}
+      <circle cx="100" cy="100" r="91" fill="none" stroke="url(#bseal_gold_outer)" strokeWidth="2.5" />
+      <circle cx="100" cy="100" r="89" fill="none" stroke="#FEF08A" strokeWidth="0.8" />
+
+      {/* 4. Royal Navy Circular Band for Typography */}
+      <circle cx="100" cy="100" r="88" fill="url(#bseal_navy)" stroke="#78350F" strokeWidth="1" />
+
+      {/* Inner Rim of Typography Band */}
+      <circle cx="100" cy="100" r="65" fill="none" stroke="url(#bseal_gold_inner)" strokeWidth="2.5" />
+      <circle cx="100" cy="100" r="63.5" fill="none" stroke="#FDE68A" strokeWidth="0.8" />
+
+      {/* 5. Curved Text: Top Arc (বাথুয়ারী গ্রাম পঞ্চায়েত) */}
+      {/* Clockwise arc over the top: radius 76.5 */}
+      <path id="bseal_top_arc" d="M 23.5 100 A 76.5 76.5 0 0 1 176.5 100" fill="none" />
+      <text fill="#FFFDF0" fontSize="10.5" fontWeight="900" letterSpacing="0.8" filter="drop-shadow(0 1px 1px rgba(0,0,0,0.8))">
+        <textPath href="#bseal_top_arc" startOffset="50%" textAnchor="middle">
           বাথুয়ারী গ্রাম পঞ্চায়েত
         </textPath>
       </text>
 
-      {/* Curved Text Path: Bottom (English) */}
-      <path id="bottomTextArc" d="M 172 100 A 72 72 0 0 1 28 100" fill="none" />
-      <text fill="#7C2D12" fontSize="9" fontWeight="900" letterSpacing="0.6">
-        <textPath href="#bottomTextArc" startOffset="50%" textAnchor="middle">
+      {/* Curved Text: Bottom Arc (BATHUARY GRAM PANCHAYAT) */}
+      {/* Counter-clockwise arc along the bottom so text baseline is oriented outward, right side up */}
+      <path id="bseal_bottom_arc" d="M 23.5 100 A 76.5 76.5 0 0 0 176.5 100" fill="none" />
+      <text fill="#FDE047" fontSize="8.5" fontWeight="900" letterSpacing="0.9" filter="drop-shadow(0 1px 1px rgba(0,0,0,0.8))">
+        <textPath href="#bseal_bottom_arc" startOffset="50%" textAnchor="middle">
           BATHUARY GRAM PANCHAYAT
         </textPath>
       </text>
 
-      {/* Star Badges at Left and Right of text ring */}
-      <polygon points="26,100 28,103 32,103 29,106 30,109 26,107 22,109 23,106 20,103 24,103" fill="#D97706" />
-      <polygon points="174,100 176,103 180,103 177,106 178,109 174,107 170,109 171,106 168,103 172,103" fill="#D97706" />
+      {/* Polished Five-Point Stars at Left & Right of Circular Band */}
+      <g transform="translate(24, 100)">
+        <polygon points="0,-4.5 1.4,-1.4 4.5,-1.2 2.1,1.1 2.8,4.2 0,2.5 -2.8,4.2 -2.1,1.1 -4.5,-1.2 -1.4,-1.4" fill="#FDE047" stroke="#92400E" strokeWidth="0.6" />
+      </g>
+      <g transform="translate(176, 100)">
+        <polygon points="0,-4.5 1.4,-1.4 4.5,-1.2 2.1,1.1 2.8,4.2 0,2.5 -2.8,4.2 -2.1,1.1 -4.5,-1.2 -1.4,-1.4" fill="#FDE047" stroke="#92400E" strokeWidth="0.6" />
+      </g>
 
-      {/* Center Shield Inner Circle */}
-      <circle cx="100" cy="100" r="66" fill="#FFFFFF" stroke="#D97706" strokeWidth="1.5" />
+      {/* 6. Central Disc: Ivory Sunburst with Fine Dotted Ring */}
+      <circle cx="100" cy="100" r="62" fill="url(#bseal_sunburst)" />
+      <circle cx="100" cy="100" r="59" fill="none" stroke="#D97706" strokeWidth="0.8" strokeDasharray="1.5 1.5" />
 
-      {/* Rising Sun Disk behind Dharma Chakra */}
-      <circle cx="100" cy="94" r="28" fill="#FEF3C7" stroke="#F59E0B" strokeWidth="1" />
-
-      {/* Sunrays */}
-      {[...Array(12)].map((_, i) => {
-        const angle = (i * 360) / 12;
+      {/* 16 Radiating Golden Sunbeams */}
+      {[...Array(16)].map((_, i) => {
+        const angle = (i * 360) / 16;
         return (
           <line
             key={i}
             x1="100"
-            y1="94"
+            y1="93"
             x2="100"
-            y2="60"
+            y2="45"
             stroke="#F59E0B"
-            strokeWidth="1.2"
-            transform={`rotate(${angle} 100 94)`}
-            strokeDasharray="4 6"
+            strokeWidth="0.75"
+            strokeOpacity="0.45"
+            strokeDasharray="2 3"
+            transform={`rotate(${angle} 100 93)`}
           />
         );
       })}
 
-      {/* Central Ashoka Chakra */}
-      <circle cx="100" cy="94" r="18" fill="#FFFFFF" stroke="#0F296B" strokeWidth="2" />
-      <circle cx="100" cy="94" r="3.5" fill="#0F296B" />
-      {[...Array(24)].map((_, i) => {
-        const angle = (i * 360) / 24;
-        return (
-          <line
-            key={i}
-            x1="100"
-            y1="94"
-            x2="100"
-            y2="76"
-            stroke="#0F296B"
-            strokeWidth="0.9"
-            transform={`rotate(${angle} 100 94)`}
-          />
-        );
-      })}
+      {/* 7. Golden Ears of Ripe Bengal Paddy (ধানের শীষ - Symmetrical Sheaves of Rice) */}
+      {/* Left Paddy Stalk */}
+      <g id="bseal_left_sheaf">
+        <path d="M 68 118 C 69 98 78 84 87 75" fill="none" stroke="#B45309" strokeWidth="1.8" strokeLinecap="round" />
+        <ellipse cx="69" cy="112" rx="3.5" ry="1.8" transform="rotate(-30 69 112)" fill="#F59E0B" stroke="#92400E" strokeWidth="0.5" />
+        <ellipse cx="72" cy="104" rx="3.5" ry="1.8" transform="rotate(-36 72 104)" fill="#FBBF24" stroke="#92400E" strokeWidth="0.5" />
+        <ellipse cx="76" cy="96" rx="3.5" ry="1.8" transform="rotate(-42 76 96)" fill="#F59E0B" stroke="#92400E" strokeWidth="0.5" />
+        <ellipse cx="81" cy="88" rx="3.2" ry="1.7" transform="rotate(-48 81 88)" fill="#FBBF24" stroke="#92400E" strokeWidth="0.5" />
+        <ellipse cx="87" cy="80" rx="3.0" ry="1.5" transform="rotate(-54 87 80)" fill="#F59E0B" stroke="#92400E" strokeWidth="0.5" />
+      </g>
 
-      {/* Golden Wheat Sheaves on Left & Right */}
-      {/* Left Grain Sheaf */}
-      <path d="M72 118 Q76 96 86 86" stroke="#D97706" strokeWidth="2" fill="none" strokeLinecap="round" />
-      <ellipse cx="74" cy="112" rx="3.5" ry="2" transform="rotate(-30 74 112)" fill="#F59E0B" />
-      <ellipse cx="77" cy="104" rx="3.5" ry="2" transform="rotate(-35 77 104)" fill="#F59E0B" />
-      <ellipse cx="81" cy="96" rx="3.5" ry="2" transform="rotate(-40 81 96)" fill="#F59E0B" />
+      {/* Right Paddy Stalk */}
+      <g id="bseal_right_sheaf">
+        <path d="M 132 118 C 131 98 122 84 113 75" fill="none" stroke="#B45309" strokeWidth="1.8" strokeLinecap="round" />
+        <ellipse cx="131" cy="112" rx="3.5" ry="1.8" transform="rotate(30 131 112)" fill="#F59E0B" stroke="#92400E" strokeWidth="0.5" />
+        <ellipse cx="128" cy="104" rx="3.5" ry="1.8" transform="rotate(36 128 104)" fill="#FBBF24" stroke="#92400E" strokeWidth="0.5" />
+        <ellipse cx="124" cy="96" rx="3.5" ry="1.8" transform="rotate(42 124 96)" fill="#F59E0B" stroke="#92400E" strokeWidth="0.5" />
+        <ellipse cx="119" cy="88" rx="3.2" ry="1.7" transform="rotate(48 119 88)" fill="#FBBF24" stroke="#92400E" strokeWidth="0.5" />
+        <ellipse cx="113" cy="80" rx="3.0" ry="1.5" transform="rotate(54 113 80)" fill="#F59E0B" stroke="#92400E" strokeWidth="0.5" />
+      </g>
 
-      {/* Right Grain Sheaf */}
-      <path d="M128 118 Q124 96 114 86" stroke="#D97706" strokeWidth="2" fill="none" strokeLinecap="round" />
-      <ellipse cx="126" cy="112" rx="3.5" ry="2" transform="rotate(30 126 112)" fill="#F59E0B" />
-      <ellipse cx="123" cy="104" rx="3.5" ry="2" transform="rotate(35 123 104)" fill="#F59E0B" />
-      <ellipse cx="119" cy="96" rx="3.5" ry="2" transform="rotate(40 119 96)" fill="#F59E0B" />
+      {/* 8. Centerpiece: Revered Dharma Chakra (Ashoka Chakra) with 24 Navy Spokes */}
+      <g id="bseal_ashoka_chakra">
+        {/* Outer White Glow Ring */}
+        <circle cx="100" cy="93" r="21" fill="#FFFFFF" stroke="#0F296B" strokeWidth="2.4" />
+        <circle cx="100" cy="93" r="19" fill="none" stroke="#0F296B" strokeWidth="0.8" strokeDasharray="1 1" />
+        {/* Inner Hub */}
+        <circle cx="100" cy="93" r="4.2" fill="#0F296B" />
+        <circle cx="100" cy="93" r="1.8" fill="#FFFFFF" />
+        {/* 24 Precise Spokes */}
+        {[...Array(24)].map((_, i) => {
+          const angle = (i * 360) / 24;
+          return (
+            <line
+              key={i}
+              x1="100"
+              y1="93"
+              x2="100"
+              y2="73.5"
+              stroke="#0F296B"
+              strokeWidth="1.1"
+              transform={`rotate(${angle} 100 93)`}
+            />
+          );
+        })}
+      </g>
 
-      {/* Base Ribbon / Banner */}
-      <path d="M60 134 Q100 126 140 134 L138 144 Q100 138 62 144 Z" fill="url(#sealSaffron)" stroke="#7C2D12" strokeWidth="1" />
-      <text x="100" y="141" textAnchor="middle" fill="#FFFFFF" fontSize="7" fontWeight="900" letterSpacing="0.4">
-        EGRA-II • ESTD 1993
+      {/* 9. Dignified Tricolor Saffron Ribbon Banner Across Bottom */}
+      <g id="bseal_ribbon">
+        {/* Ribbon Fold Tails */}
+        <path d="M 46 136 L 56 127 L 56 142 Z" fill="#9A3412" />
+        <path d="M 154 136 L 144 127 L 144 142 Z" fill="#9A3412" />
+        
+        {/* Main Ribbon Body */}
+        <path 
+          d="M 52 131 C 80 123 120 123 148 131 L 145 146 C 118 138 82 138 55 146 Z" 
+          fill="url(#bseal_saffron_ribbon)" 
+          stroke="#78350F" 
+          strokeWidth="1" 
+        />
+
+        {/* Ribbon Inner Gold Border */}
+        <path 
+          d="M 55 133 C 82 125 118 125 145 133" 
+          fill="none" 
+          stroke="#FDE68A" 
+          strokeWidth="0.75" 
+        />
+        <path 
+          d="M 57 144 C 83 136 117 136 143 144" 
+          fill="none" 
+          stroke="#FDE68A" 
+          strokeWidth="0.75" 
+        />
+
+        {/* Ribbon Text: ১২৫ দিনের কাজ • e-KYC */}
+        <text 
+          x="100" 
+          y="140" 
+          textAnchor="middle" 
+          fill="#FFFFFF" 
+          fontSize="7.5" 
+          fontWeight="900" 
+          letterSpacing="0.4"
+          filter="drop-shadow(0 1px 1px rgba(0,0,0,0.6))"
+        >
+          ১২৫ দিনের কাজ • e-KYC
+        </text>
+      </g>
+
+      {/* 10. Bottom Subtitle: Govt. of West Bengal • Egra-II */}
+      <text 
+        x="100" 
+        y="156" 
+        textAnchor="middle" 
+        fill="#166534" 
+        fontSize="7" 
+        fontWeight="900" 
+        letterSpacing="0.6"
+      >
+        GOVT. OF WEST BENGAL • EGRA-II
       </text>
 
-      {/* Sub-banner: West Bengal */}
-      <text x="100" y="156" textAnchor="middle" fill="#15803D" fontSize="7.5" fontWeight="900" letterSpacing="0.6">
-        GOVT. OF WEST BENGAL
-      </text>
+      {/* 11. Subtle Specular Glass Highlight Arch (Upper Sheen) */}
+      <path 
+        d="M 40 76 A 66 66 0 0 1 160 76 C 135 60 65 60 40 76 Z" 
+        fill="url(#bseal_glass)" 
+        pointerEvents="none" 
+      />
     </svg>
   );
 };

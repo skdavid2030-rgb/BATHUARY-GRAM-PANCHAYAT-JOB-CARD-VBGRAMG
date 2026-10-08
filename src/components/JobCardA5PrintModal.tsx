@@ -449,10 +449,6 @@ export const JobCardA5PrintModal: React.FC<JobCardA5PrintModalProps> = ({
               <p className="text-[11px] font-black text-slate-950">
                 Issue Date: <span className="font-mono font-bold text-slate-900">{new Date().toLocaleDateString('en-GB')}</span>
               </p>
-              <div className="text-[10px] font-bold text-slate-700 leading-tight">
-                <p>Office: Bathuary Gram Panchayat</p>
-                <p>Egra-II Development Block</p>
-              </div>
               <p className="text-[9px] text-slate-500 font-mono">Ref: WB/EGR2/BAT/{row.colA || '001'}</p>
             </div>
 

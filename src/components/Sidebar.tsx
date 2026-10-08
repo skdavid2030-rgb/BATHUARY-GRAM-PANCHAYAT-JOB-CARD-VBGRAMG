@@ -9,8 +9,6 @@ import {
   Sparkles, 
   Users, 
   Rocket, 
-  FileSpreadsheet, 
-  RefreshCw, 
   X,
   ExternalLink,
   Layers,
@@ -19,6 +17,7 @@ import {
   Link2
 } from 'lucide-react';
 import { NationalEmblemLogo, VbGramGActLogo } from './Emblems';
+import { AppLanguage, I18N_STRINGS } from '../utils/i18n';
 
 interface SidebarProps {
   currentTab: string;
@@ -34,6 +33,8 @@ interface SidebarProps {
     lastSyncTimestamp?: string;
   };
   isPermanentlySaved?: boolean;
+  language?: AppLanguage;
+  onLanguageChange?: (lang: AppLanguage) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -45,13 +46,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onRefreshData,
   onOpenSyncModal,
   syncedSheetInfo,
-  isPermanentlySaved
+  isPermanentlySaved,
+  language = 'bn',
+  onLanguageChange = () => {}
 }) => {
+  const isBn = language === 'bn';
+
   const navItems = [
     {
+      id: 'home',
+      label: isBn ? 'হোম পেজ' : 'Home Page',
+      sublabel: isBn ? 'সারসংক্ষেপ ও পঞ্চায়েত হাব' : 'Portal Hub & Overview',
+      icon: Home,
+      badge: 'Main',
+      activeGradient: 'from-amber-600 to-orange-600 border-amber-400/50 shadow-amber-950/60',
+      iconColor: 'text-amber-400',
+      activeIconBg: 'bg-amber-700/90 text-white',
+      badgeColor: 'bg-amber-500/30 text-amber-200 border-amber-400/40'
+    },
+    {
       id: 'dashboard',
-      label: 'Analytics Dashboard',
-      sublabel: 'Overview & 29 Villages',
+      label: isBn ? 'অ্যানালিটিক্স ড্যাশবোর্ড' : 'Analytics Dashboard',
+      sublabel: isBn ? 'সারসংক্ষেপ ও ২৯টি গ্রাম' : 'Overview & 29 Villages',
       icon: BarChart3,
       badge: 'Live',
       activeGradient: 'from-amber-600 to-orange-600 border-amber-400/50 shadow-amber-950/60',
@@ -61,8 +77,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'search',
-      label: 'Citizen Search Corner',
-      sublabel: 'Job Card & Aadhaar Search',
+      label: isBn ? 'নাগরিক অনুসন্ধান কর্নার' : 'Citizen Search Corner',
+      sublabel: isBn ? 'জব কার্ড ও আধার অনুসন্ধান' : 'Job Card & Aadhaar Search',
       icon: Search,
       badge: 'Search',
       activeGradient: 'from-blue-600 to-indigo-600 border-blue-400/50 shadow-blue-950/60',
@@ -72,8 +88,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'dataForm',
-      label: 'Data Update Form',
-      sublabel: 'Field Officer e-KYC Entry',
+      label: isBn ? 'ডাটা আপডেট ফর্ম' : 'Data Update Form',
+      sublabel: isBn ? 'ফিল্ড অফিসার e-KYC এন্ট্রি' : 'Field Officer e-KYC Entry',
       icon: UserCheck,
       badge: 'e-KYC',
       activeGradient: 'from-teal-600 to-emerald-600 border-teal-400/50 shadow-teal-950/60',
@@ -83,8 +99,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'reports',
-      label: 'Village Report & PDF',
-      sublabel: 'Official PDF Slips & Lists',
+      label: isBn ? 'গ্রাম রিপোর্ট ও PDF' : 'Village Report & PDF',
+      sublabel: isBn ? 'অফিসিয়াল PDF স্লিপ ও তালিকা' : 'Official PDF Slips & Lists',
       icon: FileText,
       badge: 'A4 Print',
       activeGradient: 'from-indigo-600 to-purple-600 border-indigo-400/50 shadow-indigo-950/60',
@@ -94,8 +110,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'ai',
-      label: 'AI Verifier Assistant',
-      sublabel: 'Audit & Eligibility Check',
+      label: isBn ? 'AI ভেরিফায়ার সহকারী' : 'AI Verifier Assistant',
+      sublabel: isBn ? 'অডিট ও যোগ্যতা যাচাই' : 'Audit & Eligibility Check',
       icon: Sparkles,
       badge: 'AI Smart',
       activeGradient: 'from-fuchsia-600 to-pink-600 border-fuchsia-400/50 shadow-fuchsia-950/60',
@@ -105,8 +121,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'deploy',
-      label: 'Deployment Guide',
-      sublabel: 'Production & Server Hosting',
+      label: isBn ? 'ডেপ্লয়মেন্ট গাইড' : 'Deployment Guide',
+      sublabel: isBn ? 'হোস্টিং ও সার্ভার নির্দেশিকা' : 'Production & Server Hosting',
       icon: Rocket,
       badge: 'Setup',
       activeGradient: 'from-rose-600 to-orange-600 border-rose-400/50 shadow-rose-950/60',
@@ -116,8 +132,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'security',
-      label: 'Security & Privacy',
-      sublabel: 'Aadhaar & Data Protection',
+      label: isBn ? 'নিরাপত্তা ও প্রাইভেসি' : 'Security & Privacy',
+      sublabel: isBn ? 'আধার ও তথ্য সুরক্ষা' : 'Aadhaar & Data Protection',
       icon: ShieldCheck,
       badge: 'ISO',
       activeGradient: 'from-slate-700 to-purple-800 border-purple-400/50 shadow-purple-950/60',
@@ -140,30 +156,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Main Sidebar Container - strictly w-72 matching workspace lg:pl-72 */}
       <aside 
         id="app-left-sidebar"
-        className={`fixed top-0 bottom-0 left-0 z-50 w-72 bg-[#0B132B] text-slate-100 flex flex-col border-r border-slate-800 shadow-2xl transition-transform duration-300 ease-in-out lg:translate-x-0 no-print ${
+        className={`fixed top-0 bottom-0 left-0 z-50 w-72 bg-gradient-to-b from-[#501503] via-[#380E02] to-[#200601] text-amber-50 flex flex-col border-r border-amber-800/80 shadow-2xl transition-transform duration-300 ease-in-out lg:translate-x-0 no-print ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         {/* Top Header with Uploaded Official Logos (Logo 1 & Logo 2) */}
-        <div className="p-4 border-b border-slate-800/80 bg-[#070D1E]">
+        <div className="p-4 border-b border-amber-700/80 bg-gradient-to-r from-[#601904] to-[#481102]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              {/* Logo 1: State Emblem of India & Logo 2: VB-GRAM G Act */}
-              <div className="flex items-center gap-1.5 p-1 bg-white rounded-xl shadow-xs border border-slate-700">
-                <NationalEmblemLogo className="w-8 h-10 text-slate-900 drop-shadow-xs" />
-                <div className="w-[1px] h-8 bg-slate-300 mx-0.5" />
-                <VbGramGActLogo className="w-14 h-8 drop-shadow-xs" />
+              {/* Official Logos: State Emblem of India & VB-GRAM G Act */}
+              <div className="flex items-center gap-1.5 p-1 bg-white rounded-xl shadow-md border border-amber-200/80">
+                <NationalEmblemLogo className="w-6 h-8 text-slate-900 drop-shadow-xs" />
+                <div className="w-[1px] h-7 bg-slate-200" />
+                <VbGramGActLogo className="w-10 h-7 drop-shadow-xs" />
               </div>
 
               <div>
-                <span className="text-[10px] font-bold tracking-wider text-emerald-400 uppercase">
-                  Govt. of West Bengal
+                <span className="text-[10px] font-bold tracking-wider text-amber-300 uppercase">
+                  {isBn ? 'পশ্চিমবঙ্গ সরকার' : 'Govt. of West Bengal'}
                 </span>
-                <h1 className="text-sm font-black text-white leading-tight uppercase">
-                  Bathuary Gram Panchayat
+                <h1 className="text-xs font-black text-white leading-tight uppercase drop-shadow-xs">
+                  {isBn ? 'বাথুয়ারী গ্রাম পঞ্চায়েত' : 'Bathuary Gram Panchayat'}
                 </h1>
-                <p className="text-[10px] text-amber-400 font-bold leading-none mt-0.5 tracking-tight">
-                  VB-GRAM G Act • Viksit Bharat 2047
+                <p className="text-[10px] text-amber-200 font-bold leading-none mt-0.5 tracking-tight">
+                  {isBn ? '১২৫ দিনের কাজ • আধার e-KYC' : '125 Days Work • e-KYC'}
                 </p>
               </div>
             </div>
@@ -171,27 +187,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* Mobile Close Button */}
             <button 
               onClick={onClose}
-              className="lg:hidden p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+              className="lg:hidden p-1.5 rounded-md text-amber-300 hover:text-white hover:bg-amber-900/80 cursor-pointer"
               aria-label="Close Sidebar"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          <div className="mt-3 flex items-center justify-between text-[11px] px-2.5 py-1 rounded-lg bg-emerald-950/50 border border-emerald-800/50 text-emerald-300">
+          <div className="mt-3 flex items-center justify-between text-[11px] px-2.5 py-1.5 rounded-lg bg-[#2A0D04]/90 border border-amber-700/60 text-amber-200 shadow-inner">
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="font-semibold">29 Canonical Villages</span>
+              <span className="font-semibold text-emerald-300">29 Canonical Villages</span>
             </span>
-            <span className="text-slate-300 font-mono text-[10px]">Egra-II Development Block</span>
+            <span className="text-amber-200/90 font-mono text-[10px]">Egra-II Development Block</span>
           </div>
         </div>
 
-        {/* Scrollable Navigation Menu (100% English) */}
-        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1.5 scrollbar-thin scrollbar-thumb-slate-800">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-3 pb-1">
-            MAIN NAVIGATION
-          </p>
+        {/* Scrollable Navigation Menu */}
+        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1.5 scrollbar-thin scrollbar-thumb-amber-900">
+          <div className="flex items-center justify-between px-3 pb-2 pt-0.5">
+            <p className="text-[10px] font-black uppercase tracking-widest text-amber-300/90 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+              MAIN NAVIGATION
+            </p>
+            <span className="text-[9px] font-bold text-amber-400/80 uppercase tracking-wider bg-amber-950/70 px-1.5 py-0.5 rounded border border-amber-800/60">
+              PORTAL
+            </span>
+          </div>
 
           {navItems.map((item) => {
             const Icon = item.icon;
@@ -207,18 +229,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-left transition-all duration-200 cursor-pointer group ${
                   isActive
                     ? `bg-gradient-to-r ${item.activeGradient} text-white font-bold shadow-lg border`
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/80 border border-transparent'
+                    : 'text-amber-100/90 hover:text-white hover:bg-amber-900/40 border border-transparent hover:border-amber-700/40'
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <div className={`p-1.5 rounded-lg transition-transform group-hover:scale-110 ${isActive ? item.activeIconBg : `bg-slate-800/90 ${item.iconColor}`}`}>
+                  <div className={`p-1.5 rounded-lg transition-transform group-hover:scale-110 ${isActive ? item.activeIconBg : `bg-amber-950/70 border border-amber-800/50 ${item.iconColor}`}`}>
                     <Icon className="w-4 h-4" />
                   </div>
                   <div>
                     <span className="block text-xs font-bold leading-tight">
                       {item.label}
                     </span>
-                    <span className={`block text-[10px] ${isActive ? 'text-white/90 font-medium' : 'text-slate-400'}`}>
+                    <span className={`block text-[10px] ${isActive ? 'text-white/95 font-medium' : 'text-amber-200/70'}`}>
                       {item.sublabel}
                     </span>
                   </div>
@@ -236,68 +258,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
             );
           })}
-        </div>
-
-        {/* Google Sheet Live Status & Sync Box */}
-        <div className="p-3 mx-3 mb-3 rounded-xl bg-slate-900/90 border border-slate-800/90 shadow-md">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-1.5">
-              <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
-              <span className="text-[11px] font-bold text-slate-200">Google Sheet Status</span>
-            </div>
-            <span className="text-[9px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-600/70 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-2xs">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              Permanent Live
-            </span>
-          </div>
-
-          <div className="text-[11px] text-slate-300 mb-2.5">
-            {syncedSheetInfo && syncedSheetInfo.totalRecords > 0 ? (
-              <div className="space-y-0.5">
-                <p className="text-emerald-300 font-bold text-xs">
-                  {syncedSheetInfo.totalRecords.toLocaleString()} Verified Citizens
-                </p>
-                <p className="text-[10px] text-slate-400">
-                  {syncedSheetInfo.villagesCount || 29} of 29 Villages Synced
-                </p>
-                <p className="text-[9px] text-emerald-400/90 font-medium pt-0.5">
-                  ✓ Permanent Link Active
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-0.5">
-                <p className="text-emerald-300 font-bold text-xs">
-                  8,017 Verified Citizens
-                </p>
-                <p className="text-[10px] text-slate-400">
-                  29 of 29 Villages Synced
-                </p>
-                <p className="text-[9px] text-emerald-400/90 font-medium pt-0.5">
-                  ✓ Permanent Link Active
-                </p>
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-1.5">
-            <button
-              id="sidebar-refresh-btn"
-              onClick={onRefreshData}
-              disabled={isSyncing}
-              className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl btn-3d-sync text-white font-bold text-xs cursor-pointer disabled:opacity-50"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-amber-200' : ''}`} />
-              <span>{isSyncing ? 'Syncing Live Sheet...' : 'Refresh Live Data'}</span>
-            </button>
-            <button
-              id="sidebar-sheet-link-btn"
-              onClick={onOpenSyncModal}
-              className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 text-emerald-300 font-bold text-[11px] border border-slate-700/80 transition-colors cursor-pointer"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5" />
-              <span>গুগল শিট স্ট্যাটাস (Permanent Link)</span>
-            </button>
-          </div>
         </div>
       </aside>
     </>
