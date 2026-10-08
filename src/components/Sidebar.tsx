@@ -1,23 +1,16 @@
 import React from 'react';
 import { 
-  Home,
-  LayoutDashboard,
   BarChart3,
   Search, 
   UserCheck, 
   FileText, 
   Sparkles, 
-  Users, 
   Rocket, 
   X,
-  ExternalLink,
-  Layers,
-  Database,
-  ShieldCheck,
-  Link2
+  ShieldCheck
 } from 'lucide-react';
 import { NationalEmblemLogo, VbGramGActLogo } from './Emblems';
-import { AppLanguage, I18N_STRINGS } from '../utils/i18n';
+import { AppLanguage } from '../utils/i18n';
 
 interface SidebarProps {
   currentTab: string;
@@ -53,17 +46,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const isBn = language === 'bn';
 
   const navItems = [
-    {
-      id: 'home',
-      label: isBn ? 'হোম পেজ' : 'Home Page',
-      sublabel: isBn ? 'সারসংক্ষেপ ও পঞ্চায়েত হাব' : 'Portal Hub & Overview',
-      icon: Home,
-      badge: 'Main',
-      activeGradient: 'from-amber-600 to-orange-600 border-amber-400/50 shadow-amber-950/60',
-      iconColor: 'text-amber-400',
-      activeIconBg: 'bg-amber-700/90 text-white',
-      badgeColor: 'bg-amber-500/30 text-amber-200 border-amber-400/40'
-    },
     {
       id: 'dashboard',
       label: isBn ? 'অ্যানালিটিক্স ড্যাশবোর্ড' : 'Analytics Dashboard',
