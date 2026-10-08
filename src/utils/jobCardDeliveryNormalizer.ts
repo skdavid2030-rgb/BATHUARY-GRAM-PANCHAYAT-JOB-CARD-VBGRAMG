@@ -7,12 +7,17 @@ export function normalizeJobCardBookDelivered(value: any, allowEmpty: boolean = 
   const raw = String(value).trim();
   if (!raw) return allowEmpty ? ('' as any) : 'No';
 
-  const lower = raw.toLowerCase();
+  // Strip trailing punctuation like '.', ',', ';', spaces
+  const lower = raw.toLowerCase().trim().replace(/[.,;:\s]+$/, '');
+  const cleanAlpha = lower.replace(/[^a-z0-9\u0980-\u09FF]/g, '');
 
-  // Affirmative delivery patterns: Yes, Y, 1, Delivered, Deliverd, Completed, ইত্যাদি
+  // Affirmative delivery patterns: Yes, Yes., Y, 1, Delivered, Deliverd, Completed, ইত্যাদি
   if (
     lower === 'yes' ||
+    cleanAlpha === 'yes' ||
+    lower.startsWith('yes') ||
     lower === 'y' ||
+    cleanAlpha === 'y' ||
     lower === '1' ||
     lower === 'true' ||
     lower.includes('deliver') ||
@@ -23,6 +28,7 @@ export function normalizeJobCardBookDelivered(value: any, allowEmpty: boolean = 
     lower.includes('হয়েছে') ||
     lower.includes('হয়েছে') ||
     lower.includes('হ্যাঁ') ||
+    cleanAlpha === 'হ্যাঁ' ||
     lower.includes('দেওয়া') ||
     lower.includes('দেওয়া') ||
     lower.includes('বিলি') ||
@@ -36,12 +42,16 @@ export function normalizeJobCardBookDelivered(value: any, allowEmpty: boolean = 
   // Negative delivery patterns: No, N, 0, Pending, Not Delivered, ইত্যাদি
   if (
     lower === 'no' ||
+    cleanAlpha === 'no' ||
+    lower.startsWith('no') ||
     lower === 'n' ||
+    cleanAlpha === 'n' ||
     lower === '0' ||
     lower === 'false' ||
     lower.includes('not') ||
     lower.includes('pending') ||
     lower.includes('না') ||
+    cleanAlpha === 'না' ||
     lower.includes('বাকি') ||
     lower.includes('দেওয়া হয়নি') ||
     lower.includes('দেওয়া হয়নি') ||

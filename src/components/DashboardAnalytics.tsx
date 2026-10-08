@@ -81,9 +81,7 @@ export const DashboardAnalytics: React.FC<DashboardProps> = ({
     return set.size;
   }, [beneficiaries]);
 
-  const deliveredCount = selectedSansad && selectedSansad !== 'ALL'
-    ? uniqueDeliveredCards
-    : (analytics.bookDelivered !== undefined && analytics.bookDelivered > 0 ? analytics.bookDelivered : uniqueDeliveredCards);
+  const deliveredCount = uniqueDeliveredCards;
   const deliveredPct = uniqueJobCardCount > 0 ? Math.round((deliveredCount / uniqueJobCardCount) * 100) : 0;
 
   // Filtered unique cards for the drill-down modal
@@ -125,7 +123,7 @@ export const DashboardAnalytics: React.FC<DashboardProps> = ({
 
       {/* Top Banner with Sansad Selector */}
       <div className="rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 sm:p-8 shadow-xl border border-indigo-900/50 relative overflow-hidden">
-        <div className="h-1.5 w-full bg-gradient-to-r from-emerald-400 via-teal-300 to-indigo-400 absolute top-0 left-0" />
+        <div className="h-2 w-full bg-gradient-to-r from-orange-500 via-amber-400 via-emerald-400 to-teal-400 absolute top-0 left-0" />
         
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
           <div>
@@ -430,8 +428,8 @@ export const DashboardAnalytics: React.FC<DashboardProps> = ({
       </div>
 
       {/* Village Breakdown Grid (Showing all 29 Villages) */}
-      <div className="rounded-3xl bg-white border-2 border-slate-200/80 p-6 sm:p-7 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5 border-b border-slate-100 pb-4">
+      <div className="rounded-3xl bg-[#FFFDFB] border-2 border-amber-200/90 p-6 sm:p-7 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5 border-b border-amber-100 pb-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-600 text-white flex items-center justify-center shadow-md shadow-emerald-600/20">
               <TrendingUp className="w-5 h-5" />

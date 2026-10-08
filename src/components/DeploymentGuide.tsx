@@ -118,8 +118,8 @@ CMD ["node", "dist/server.cjs"]`;
       </div>
 
       {/* Option 1: Vercel (Recommended) */}
-      <div className="rounded-3xl bg-gradient-to-br from-white via-slate-50 to-emerald-50/20 border-2 border-slate-200/80 p-6 sm:p-8 shadow-sm hover:shadow-md transition-all relative overflow-hidden space-y-4">
-        <div className="h-1.5 w-full bg-gradient-to-r from-emerald-500 to-teal-500 absolute top-0 left-0" />
+      <div className="rounded-3xl bg-[#FFFDFB] border-2 border-amber-200/90 p-6 sm:p-8 shadow-sm hover:shadow-md transition-all relative overflow-hidden space-y-4">
+        <div className="h-1.5 w-full bg-gradient-to-r from-orange-500 via-amber-400 to-emerald-500 absolute top-0 left-0" />
         
         <div className="flex items-center justify-between border-b border-slate-200/80 pb-3.5">
           <div className="flex items-center gap-3">

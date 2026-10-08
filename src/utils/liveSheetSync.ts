@@ -4,7 +4,6 @@ import { normalizeVillageName } from './villageNormalizer';
 import { normalizeSansadName, sortSansads, isHeaderOrJunkSansad } from './sansadNormalizer';
 import { normalizeJobCardBookDelivered, normalizeJobCardSubmitted } from './jobCardDeliveryNormalizer';
 import { healBeneficiaryRecord } from './beneficiaryHealer';
-import { autoFixBankDetails } from './rbiBankResolver';
 import { formatKycDate } from './dateFormatter';
 import { safeStorage } from './safeStorage';
 import {
@@ -32,21 +31,24 @@ export function computeDatasetFingerprint(records: BeneficiaryRow[]): string {
   let kycCount = 0;
   let deliveredCount = 0;
   let abpsCount = 0;
+  let bankAccountsCount = 0;
   let quickHash = 0;
 
   for (let i = 0; i < records.length; i++) {
     const r = records[i];
     if (r.colR && (r.colR.toUpperCase() === 'YES' || r.colR.toUpperCase() === 'Y')) kycCount++;
-    if (r.colY && r.colY.toUpperCase() === 'YES') deliveredCount++;
+    if (r.colY && normalizeJobCardBookDelivered(r.colY) === 'Yes') deliveredCount++;
     if (r.colO && (r.colO.toUpperCase() === 'YES' || r.colO.toUpperCase() === 'Y')) abpsCount++;
-    // Sample char codes from critical fields to detect in-place text edits
-    const sample = (r.colH || '') + (r.colY || '') + (r.colR || '') + (r.colQ || '');
-    for (let j = 0; j < sample.length; j += 7) {
+    if (r.colAR && r.colAR.trim()) bankAccountsCount++;
+
+    // Sample char codes from critical fields to detect in-place text edits across sheet
+    const sample = (r.colH || '') + (r.colJ || '') + (r.colY || '') + (r.colR || '') + (r.colQ || '') + (r.colP || '') + (r.colAO || '') + (r.colAP || '') + (r.colAR || '');
+    for (let j = 0; j < sample.length; j += 5) {
       quickHash = (quickHash * 31 + sample.charCodeAt(j)) | 0;
     }
   }
 
-  return `${records.length}_${kycCount}_${deliveredCount}_${abpsCount}_${quickHash}`;
+  return `${records.length}_${kycCount}_${deliveredCount}_${abpsCount}_${bankAccountsCount}_${quickHash}`;
 }
 
 /**
@@ -242,19 +244,10 @@ export function parseSheetRowsToBeneficiaries(rawData: any[][]): BeneficiaryRow[
       colY: normalizeJobCardBookDelivered(get('colY', 24)),
       colAF: get('colAF', 31).toUpperCase(),
       colAG: get('colAG', 32).toUpperCase() || (name || '').toUpperCase(),
-      ...(() => {
-        const rawBank = get('colAO', 40);
-        const rawIfsc = get('colAP', 41);
-        const rawBranch = get('colAQ', 42);
-        const accountNo = get('colAR', 43).trim();
-        const fixed = autoFixBankDetails(rawBank, rawIfsc, rawBranch);
-        return {
-          colAO: fixed.bank,
-          colAP: fixed.ifsc,
-          colAQ: fixed.branch,
-          colAR: accountNo
-        };
-      })()
+      colAO: get('colAO', 40).trim(),
+      colAP: get('colAP', 41).trim(),
+      colAQ: get('colAQ', 42).trim(),
+      colAR: get('colAR', 43).trim()
     };
 
     parsed.push(healBeneficiaryRecord(record));
@@ -277,21 +270,23 @@ async function fetchFromGoogleSheetGViz(sheetUrl: string): Promise<BeneficiaryRo
     throw new Error('Invalid Google Sheet URL format.');
   }
 
+  const timestampBuster = Date.now();
   const candidateUrls = pubMatch
     ? [
-        `https://docs.google.com/spreadsheets/d/e/${sheetId}/pub?output=csv&gid=${gid}`,
-        `https://docs.google.com/spreadsheets/d/e/${sheetId}/pub?output=csv`
+        `https://docs.google.com/spreadsheets/d/e/${sheetId}/pub?output=csv&gid=${gid}&_t=${timestampBuster}`,
+        `https://docs.google.com/spreadsheets/d/e/${sheetId}/pub?output=csv&_t=${timestampBuster}`
       ]
     : [
-        `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&gid=${gid}`,
-        `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`,
-        `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv`
+        `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&gid=${gid}&_t=${timestampBuster}`,
+        `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}&_t=${timestampBuster}`,
+        `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&_t=${timestampBuster}`
       ];
 
   let csvContent = '';
   for (const url of candidateUrls) {
     try {
       const res = await fetch(url, {
+        cache: 'no-store',
         headers: { 'Accept': 'text/csv, text/plain, */*' }
       });
       if (res.ok) {
@@ -441,31 +436,41 @@ export async function syncLiveGoogleSheet(options?: {
   let source: 'api' | 'gviz' | 'apps_script' | 'cache' | 'export_csv' = 'gviz';
   let syncMessage = '';
 
+  // Check if running on static host (e.g. Netlify)
+  const isStaticHost = typeof window !== 'undefined' && (
+    window.location.hostname.includes('netlify.app') ||
+    window.location.hostname.includes('web.app') ||
+    window.location.hostname.includes('firebaseapp.com') ||
+    window.location.protocol === 'file:'
+  );
+
   // -------------------------------------------------------------
   // STRATEGY 1: Check Express backend API if active (Dev / Container)
   // -------------------------------------------------------------
   let apiSucceeded = false;
-  try {
-    const apiEndpoint = options?.force ? '/api/google-sheet/refresh' : '/api/beneficiaries';
-    const apiRes = await fetch(apiEndpoint, {
-      method: options?.force ? 'POST' : 'GET',
-      headers: { 'Accept': 'application/json', ...(options?.force ? { 'Content-Type': 'application/json' } : {}) }
-    });
+  if (!isStaticHost) {
+    try {
+      const apiEndpoint = options?.force ? '/api/google-sheet/refresh' : '/api/beneficiaries';
+      const apiRes = await fetch(apiEndpoint, {
+        method: options?.force ? 'POST' : 'GET',
+        headers: { 'Accept': 'application/json', ...(options?.force ? { 'Content-Type': 'application/json' } : {}) }
+      });
 
-    if (apiRes.ok) {
-      const contentType = apiRes.headers.get('content-type') || '';
-      if (contentType.includes('application/json')) {
-        const data = await apiRes.json();
-        if (data && Array.isArray(data.beneficiaries) && data.beneficiaries.length > 0) {
-          beneficiaries = data.beneficiaries;
-          source = 'api';
-          syncMessage = data.message || `API Sync: ${beneficiaries.length} records`;
-          apiSucceeded = true;
+      if (apiRes.ok) {
+        const contentType = apiRes.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const data = await apiRes.json();
+          if (data && Array.isArray(data.beneficiaries) && data.beneficiaries.length > 0) {
+            beneficiaries = data.beneficiaries;
+            source = 'api';
+            syncMessage = data.message || `API Sync: ${beneficiaries.length} records`;
+            apiSucceeded = true;
+          }
         }
       }
+    } catch {
+      // API not reachable (e.g. running on Netlify or static host)
     }
-  } catch {
-    // API not reachable (e.g. running on Netlify or static host)
   }
 
   // -------------------------------------------------------------

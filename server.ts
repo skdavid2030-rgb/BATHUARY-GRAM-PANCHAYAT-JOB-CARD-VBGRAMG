@@ -712,21 +712,10 @@ function parseAndMapSheetRows(rawData: any[][]): BeneficiaryRow[] {
       colY: normalizeJobCardBookDelivered(get('colY', 24)),
       colAF: get('colAF', 31).toUpperCase(),
       colAG: get('colAG', 32).toUpperCase() || (name || '').toUpperCase(),
-      ...(() => {
-        const rawBank = get('colAO', 40);
-        const rawIfsc = get('colAP', 41);
-        const rawBranch = get('colAQ', 42);
-        const accountNo = get('colAR', 43).trim();
-
-        const fixed = autoFixBankDetails(rawBank, rawIfsc, rawBranch);
-
-        return {
-          colAO: fixed.bank,
-          colAP: fixed.ifsc,
-          colAQ: fixed.branch,
-          colAR: accountNo
-        };
-      })()
+      colAO: get('colAO', 40).trim(),
+      colAP: get('colAP', 41).trim(),
+      colAQ: get('colAQ', 42).trim(),
+      colAR: get('colAR', 43).trim()
     };
 
     parsed.push(healBeneficiaryRecord(record));
@@ -1009,7 +998,7 @@ async function fetchBeneficiariesFromAppsScript(scriptUrl: string): Promise<{
   const fetchUrl = `${scriptUrl}${separator}action=read&format=json`;
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 35000);
+  const timer = setTimeout(() => controller.abort(), 8000);
 
   const response = await fetch(fetchUrl, {
     method: "GET",
@@ -1120,17 +1109,17 @@ async function fetchAndParseGoogleSheet(rawUrl: string): Promise<{
     throw new Error("Invalid Google Sheet link. Please copy the full link from your browser address bar (e.g. https://docs.google.com/spreadsheets/d/.../edit).");
   }
 
-  // URLs to try in priority order
+  // URLs to try in priority order (gviz is instant < 1s and avoids Google auth redirects)
   const candidateUrls = pubMatch 
     ? [
         `https://docs.google.com/spreadsheets/d/e/${sheetId}/pub?output=csv&gid=${gid}`,
         `https://docs.google.com/spreadsheets/d/e/${sheetId}/pub?output=csv`
       ]
     : [
-        `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`,
         `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&gid=${gid}`,
-        `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`,
-        `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv`
+        `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`,
+        `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv`,
+        `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`
       ];
 
   let csvContent = "";
@@ -1243,31 +1232,33 @@ async function performLiveGoogleSheetSync(force: boolean = false): Promise<{
   try {
     let res: any = null;
 
-    // STEP 1: PRIMARY SOURCE - Pull live data from official Google Apps Script Web App (user's mobile app Code.gs endpoint)
-    if (scriptUrl && scriptUrl.startsWith("https://script.google.com/")) {
-      try {
-        console.log(`[Permanent-Live-Sync] Pulling live data via Google Apps Script: ${scriptUrl}`);
-        res = await fetchBeneficiariesFromAppsScript(scriptUrl);
-        console.log(`[Permanent-Live-Sync] Apps Script live sync succeeded with ${res.beneficiaries.length} records.`);
-      } catch (gasErr: any) {
-        console.warn(`[Permanent-Live-Sync] Apps Script sync failed (${gasErr.message}), falling back to direct sheet export...`);
-      }
-    }
-
-    // STEP 2: FALLBACK SOURCE - Direct Google Spreadsheet CSV export
-    if (!res || !res.beneficiaries || res.beneficiaries.length === 0) {
-      console.log(`[Permanent-Live-Sync] Pulling live data from Google Sheet: ${urlToSync}`);
-      try {
-        res = await fetchAndParseGoogleSheet(urlToSync);
-      } catch (primaryErr: any) {
-        if (urlToSync !== PERMANENT_DEFAULT_SHEET_URL) {
-          console.warn(`[Permanent-Live-Sync] Primary sheet sync failed, falling back to permanent default sheet:`, primaryErr.message);
+    // STEP 1: PRIMARY SOURCE - Direct Google Spreadsheet GViz / CSV export (Instantaneous < 1s, official sheet source of truth)
+    console.log(`[Permanent-Live-Sync] Pulling live data directly from Google Sheet: ${urlToSync}`);
+    try {
+      res = await fetchAndParseGoogleSheet(urlToSync);
+      console.log(`[Permanent-Live-Sync] Direct Google Sheet live sync succeeded with ${res.beneficiaries.length} records.`);
+    } catch (primaryErr: any) {
+      console.warn(`[Permanent-Live-Sync] Primary sheet export notice (${primaryErr.message})`);
+      if (urlToSync !== PERMANENT_DEFAULT_SHEET_URL) {
+        try {
+          console.log(`[Permanent-Live-Sync] Retrying with permanent default sheet: ${PERMANENT_DEFAULT_SHEET_URL}`);
           res = await fetchAndParseGoogleSheet(PERMANENT_DEFAULT_SHEET_URL);
           urlToSync = PERMANENT_DEFAULT_SHEET_URL;
           activeSyncedSheetUrl = PERMANENT_DEFAULT_SHEET_URL;
-        } else {
-          throw primaryErr;
+        } catch (fallbackErr: any) {
+          console.warn(`[Permanent-Live-Sync] Default sheet export notice:`, fallbackErr.message);
         }
+      }
+    }
+
+    // STEP 2: FALLBACK SOURCE - Google Apps Script Web App (if direct sheet export was unavailable)
+    if ((!res || !res.beneficiaries || res.beneficiaries.length === 0) && scriptUrl && scriptUrl.startsWith("https://script.google.com/")) {
+      try {
+        console.log(`[Permanent-Live-Sync] Trying fallback via Google Apps Script: ${scriptUrl}`);
+        res = await fetchBeneficiariesFromAppsScript(scriptUrl);
+        console.log(`[Permanent-Live-Sync] Apps Script live sync succeeded with ${res.beneficiaries.length} records.`);
+      } catch (gasErr: any) {
+        console.warn(`[Permanent-Live-Sync] Apps Script sync notice (${gasErr.message})`);
       }
     }
     if (res.beneficiaries && res.beneficiaries.length > 0) {
@@ -2554,7 +2545,7 @@ app.post("/api/ai/chat", async (req: Request, res: Response) => {
 
     if (lower.includes('abps') || lower.includes('এবিপিএস') || lower.includes('payment') || lower.includes('মজুরি') || lower.includes('wage') || lower.includes('টাকা')) {
       if (isBengali) {
-        return `ABPS (Aadhaar Based Payment System) সম্পর্কিত নির্দেশিকা:\n১. উপভোক্তার ১২ সংখ্যার আধার নম্বর জব কার্ডে সিড থাকতে হবে।\n২. উপভোক্তার ব্যাংক একাউন্টে আধার লিঙ্ক ও NPCI (National Payments Corporation of India) ম্যাপারে সক্রিয় (Active DBT Enabled) থাকতে হবে।\n৩. যদি ব্যাংকে আধার লিঙ্ক না থাকে, তবে অবিলম্বে ব্যাংক শাখায় 'Aadhaar NPCI Mapping Consent Form' জমা দিতে হবে যাতে ১০০ দিনের কাজের মজুরি সরাসরি অ্যাকাউন্টে জমা হতে পারে।`;
+        return `ABPS (Aadhaar Based Payment System) সম্পর্কিত নির্দেশিকা:\n১. উপভোক্তার ১২ সংখ্যার আধার নম্বর জব কার্ডে সিড থাকতে হবে।\n২. উপভোক্তার ব্যাংক একাউন্টে আধার লিঙ্ক ও NPCI (National Payments Corporation of India) ম্যাপারে সক্রিয় (Active DBT Enabled) থাকতে হবে।\n৩. যদি ব্যাংকে আধার লিঙ্ক না থাকে, তবে অবিলম্বে ব্যাংক শাখায় 'Aadhaar NPCI Mapping Consent Form' জমা দিতে হবে যাতে ১২৫ দিনের কাজের মজুরি সরাসরি অ্যাকাউন্টে জমা হতে পারে।`;
       }
       return `ABPS (Aadhaar Based Payment System) Guidelines:\n1. 12-digit Aadhaar UID must be seeded to the Job Card.\n2. Beneficiary bank account must have Aadhaar seeded and active on NPCI DBT Mapper.\n3. If not enabled, visit the bank branch with Aadhaar and passbook to submit the Aadhaar NPCI Mapping Consent Form.`;
     }
@@ -2605,7 +2596,7 @@ OFFICIAL VERIFIED PANCHAYAT GROUND TRUTH:
   * Deceased / Inactive marked: ${deadCount} জন
   * ABPS Enabled: ${abpsCount} জন
 - Key Govt Schemes & Regulations:
-  * MGNREGA / VB-G RAM G: ১০০ দিনের গ্রামীণ কর্মসংস্থান নিশ্চয়তা যোজনা
+  * MGNREGA / VB-G RAM G: ১২৫ দিনের কর্মশ্রী ও গ্রামীণ কর্মসংস্থান নিশ্চয়তা যোজনা
   * e-KYC: ১২-ডিজিটের বৈধ আধার সিডিং ও বায়োমেট্রিক অথেন্টিকেশন
   * ABPS (Aadhaar Based Payment System): ব্যাংক একাউন্টে আধার লিঙ্ক ও NPCI ম্যাপারে DBT এনাবল করা
   * Bank Mergers:

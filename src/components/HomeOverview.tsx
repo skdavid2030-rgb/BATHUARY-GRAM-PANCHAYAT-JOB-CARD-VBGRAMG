@@ -37,7 +37,7 @@ export const HomeOverview: React.FC<HomeOverviewProps> = ({
   return (
     <div className="space-y-6">
       {/* 0. Dynamic Government Notice Ticker */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-700 text-white shadow-md p-0.5 animate-gradient-shift">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-orange-500 via-amber-400 to-emerald-600 text-white shadow-md p-0.5 animate-gradient-shift">
         <div className="bg-slate-950/90 backdrop-blur-md rounded-[14px] px-4 py-2.5 flex items-center gap-3">
           <div className="flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 px-2.5 py-1 rounded-lg font-black text-[11px] shrink-0 shadow-xs uppercase tracking-wider">
             <span className="w-2 h-2 rounded-full bg-red-600 animate-ping" />

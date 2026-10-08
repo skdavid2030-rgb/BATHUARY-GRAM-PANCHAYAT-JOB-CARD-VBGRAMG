@@ -19,7 +19,7 @@ import {
   RefreshCw,
   X
 } from 'lucide-react';
-import { NationalEmblemLogo, VbGramGActLogo } from './Emblems';
+import { NationalEmblemLogo, VbGramGActLogo, BathuaryGramPanchayatOfficialLogo } from './Emblems';
 import { BeneficiaryRow, AppUser } from '../types';
 import { safeStorage } from '../utils/safeStorage';
 
@@ -59,6 +59,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, beneficiar
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [logoutNotice, setLogoutNotice] = useState<string | null>(null);
 
   // Change Password Modal States
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState<boolean>(false);
@@ -70,28 +71,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, beneficiar
   const [changePasswordError, setChangePasswordError] = useState<string | null>(null);
   const [changePasswordSuccess, setChangePasswordSuccess] = useState<string | null>(null);
 
-  // 3D Card Interactive Tilt State
-  const [rotateX, setRotateX] = useState<number>(0);
-  const [rotateY, setRotateY] = useState<number>(0);
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const card = e.currentTarget;
-    const rect = card.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
-    // Subtle 3D tilt calculation
-    const rX = -((y - centerY) / centerY) * 7;
-    const rY = ((x - centerX) / centerX) * 7;
-    setRotateX(rX);
-    setRotateY(rY);
-  };
-
-  const handleMouseLeave = () => {
-    setRotateX(0);
-    setRotateY(0);
-  };
+  // Check for auto-logout (inactivity or tab closed)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const reason = window.sessionStorage?.getItem('bathuary_logout_reason');
+      if (reason === 'inactivity') {
+        setLogoutNotice('নিরাপত্তা বিজ্ঞপ্তি: দীর্ঘক্ষণ কোনো কাজ না করা বা ব্রাউজার বন্ধ করার কারণে সেশন স্বয়ংক্রিয়ভাবে শেষ হয়েছে। অনুগ্রহ করে পুনরায় লগইন করুন। (Session ended due to inactivity or tab closure. Please log in again.)');
+      }
+    }
+  }, []);
 
   // Live Metrics State - initialized with authentic Bathuary GP database numbers
   const [liveMetrics, setLiveMetrics] = useState<MetricsState>(REAL_BATHUARY_METRICS);
@@ -206,10 +194,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, beneficiar
           lastLogin: new Date().toLocaleString('en-IN')
         };
 
-        // Cache session
+        // Cache session (sessionStorage ensures browser close requires re-login)
         safeStorage.setItem('bathuary_auth_user', JSON.stringify(appUser));
         safeStorage.setItem('bathuary_auth_token', data.token || 'bathuary_official_auth');
-        safeStorage.setItem('bathuary_auth_logged_in', 'true');
+        if (typeof window !== 'undefined') {
+          window.sessionStorage?.setItem('bathuary_session_active', 'true');
+          window.sessionStorage?.setItem('bathuary_last_active', String(Date.now()));
+          window.sessionStorage?.removeItem('bathuary_logout_reason');
+        }
 
         setSuccessMessage('লগইন সফল হয়েছে! পোর্টালে প্রবেশ করা হচ্ছে... (Login Successful!)');
         setTimeout(() => {
@@ -231,7 +223,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, beneficiar
             lastLogin: new Date().toLocaleString('en-IN')
           };
           safeStorage.setItem('bathuary_auth_user', JSON.stringify(appUser));
-          safeStorage.setItem('bathuary_auth_logged_in', 'true');
+          if (typeof window !== 'undefined') {
+            window.sessionStorage?.setItem('bathuary_session_active', 'true');
+            window.sessionStorage?.setItem('bathuary_last_active', String(Date.now()));
+            window.sessionStorage?.removeItem('bathuary_logout_reason');
+          }
           setSuccessMessage('লগইন সফল হয়েছে! (Login Successful!)');
           setTimeout(() => {
             onLoginSuccess(appUser);
@@ -256,7 +252,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, beneficiar
           lastLogin: new Date().toLocaleString('en-IN')
         };
         safeStorage.setItem('bathuary_auth_user', JSON.stringify(appUser));
-        safeStorage.setItem('bathuary_auth_logged_in', 'true');
+        if (typeof window !== 'undefined') {
+          window.sessionStorage?.setItem('bathuary_session_active', 'true');
+          window.sessionStorage?.setItem('bathuary_last_active', String(Date.now()));
+          window.sessionStorage?.removeItem('bathuary_logout_reason');
+        }
         setSuccessMessage('লগইন সফল হয়েছে! (Offline Mode)');
         setTimeout(() => {
           onLoginSuccess(appUser);
@@ -363,42 +363,43 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, beneficiar
   };
 
   return (
-    <div className="min-h-screen bg-radial from-[#0d1b2a] via-[#081220] to-[#040810] text-slate-100 flex flex-col justify-between relative overflow-x-hidden selection:bg-emerald-500 selection:text-white">
-      {/* Background Ambient Cyber-Mesh Glows */}
-      <div className="absolute top-0 left-1/4 w-96 h-96 bg-emerald-600/15 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-10 right-1/4 w-[30rem] h-[30rem] bg-indigo-600/15 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute top-1/3 right-10 w-80 h-80 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
+    <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] via-[#FFF3E3] to-[#FFEBD4] text-slate-800 flex flex-col justify-between relative overflow-x-hidden selection:bg-orange-500 selection:text-white">
+      {/* Background Ambient Warm Gerua Glows */}
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-orange-400/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-10 right-1/4 w-[30rem] h-[30rem] bg-amber-300/15 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-1/3 right-10 w-80 h-80 bg-yellow-400/10 rounded-full blur-3xl pointer-events-none" />
 
-      {/* Top Animated Shimmer Bar */}
-      <div className="h-1.5 w-full bg-gradient-to-r from-emerald-400 via-teal-400 via-sky-400 via-indigo-500 via-purple-500 to-amber-400 animate-gradient-shift" />
+      {/* Top Tricolor / Saffron Accent Bar */}
+      <div className="h-2 w-full bg-gradient-to-r from-orange-500 via-amber-400 via-white via-emerald-500 to-emerald-600 shadow-xs" />
 
       {/* Top Official Portal Navigation Bar */}
-      <header className="px-4 sm:px-8 py-3.5 border-b border-slate-800/80 bg-slate-950/70 backdrop-blur-md sticky top-0 z-20">
+      <header className="px-4 sm:px-8 py-3.5 border-b border-orange-200/80 bg-white/85 backdrop-blur-md sticky top-0 z-20 shadow-xs">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <NationalEmblemLogo size={42} />
+            <BathuaryGramPanchayatOfficialLogo size={42} className="hidden sm:inline-block" />
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xs sm:text-sm font-black text-white tracking-wide uppercase">
+                <span className="text-xs sm:text-sm font-black text-slate-900 tracking-wide uppercase">
                   বাথুয়ারী গ্রাম পঞ্চায়েত
                 </span>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-black uppercase tracking-wider hidden sm:inline">
+                <span className="px-2 py-0.5 rounded-full bg-orange-100 text-orange-800 border border-orange-200 text-[10px] font-black uppercase tracking-wider hidden sm:inline">
                   OFFICIAL SECURE GATEWAY
                 </span>
               </div>
-              <div className="text-[11px] text-slate-400 font-medium">
+              <div className="text-[11px] text-amber-900 font-semibold">
                 Panchayats & Rural Development • Egra-II Development Block, Purba Medinipur
               </div>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            <VbGramGActLogo size={38} />
+            <VbGramGActLogo size={40} />
             <div className="text-right hidden sm:block">
-              <div className="text-[11px] font-black text-amber-300 uppercase tracking-wider">
+              <div className="text-[11px] font-black text-orange-700 uppercase tracking-wider">
                 VB-G RAM G • 125 DAYS WORK
               </div>
-              <div className="text-[10px] text-slate-400">
+              <div className="text-[10px] text-slate-600 font-medium">
                 e-KYC & ABPS Direct DBT Portal
               </div>
             </div>
@@ -407,46 +408,46 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, beneficiar
       </header>
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-10 flex flex-col justify-center">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 flex flex-col justify-center">
         {/* =====================================================================
-            READ-ONLY ANALYTICS DASHBOARD BADGES SECTION
-            (Strictly Read-Only as requested, highlighting real GP database metrics)
+            READ-ONLY DYNAMIC LIVE ANALYTICS BADGES SECTION
+            (Fixed, stable, non-wobbling, rich live dynamic metrics)
             ===================================================================== */}
-        <section className="mb-8">
-          <div className="flex items-center justify-between gap-3 mb-3 px-1">
+        <section className="mb-6 sm:mb-8">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3 px-1">
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
-                <BarChart3 className="w-3.5 h-3.5" />
+              <div className="w-7 h-7 rounded-lg bg-orange-100 text-orange-700 flex items-center justify-center border border-orange-200">
+                <BarChart3 className="w-4 h-4" />
               </div>
-              <h2 className="text-xs sm:text-sm font-black text-slate-200 uppercase tracking-wider">
-                Live Analytics Badges (Bathuary GP Database)
-              </h2>
+              <div>
+                <h2 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider">
+                  লাইভ অ্যানালিটিক্স ড্যাশবোর্ড (Live Database View)
+                </h2>
+                <p className="text-[10px] text-slate-600 font-medium">Bathuary GP Master Database Verified Metrics</p>
+              </div>
             </div>
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-800/90 border border-slate-700/80 text-[10px] text-emerald-400 font-black shadow-inner">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              <span>🔒 READ-ONLY ANALYTICS BADGES</span>
+            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-orange-200 text-[10px] text-orange-800 font-black shadow-xs">
+              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+              <span>DYNAMIC LIVE VIEW • REAL-TIME SYNC</span>
             </div>
           </div>
 
-          {/* 6 High-Prestige 3D Glass Badges */}
+          {/* 6 High-Prestige Solid Dynamic Badges (Steady, no wobbling) */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {/* Badge 1: Total Beneficiaries */}
             <div 
               id="login-badge-total"
-              className="group relative rounded-2xl bg-gradient-to-b from-slate-800/80 to-slate-900/90 border border-slate-700/70 p-3.5 shadow-lg backdrop-blur-md transition-all duration-300 hover:border-emerald-500/50 hover:shadow-emerald-500/10 cursor-default"
+              className="relative rounded-2xl bg-white/95 border border-orange-200/90 p-3.5 shadow-xs transition-all hover:border-orange-400 hover:shadow-md cursor-default"
             >
-              <div className="flex items-center justify-between text-slate-400 mb-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider">Enrolled Citizens</span>
-                <Users className="w-3.5 h-3.5 text-emerald-400" />
+              <div className="flex items-center justify-between text-slate-600 mb-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider">নথিভুক্ত নাগরিক</span>
+                <Users className="w-3.5 h-3.5 text-orange-600" />
               </div>
-              <div className="text-xl sm:text-2xl font-black text-white font-mono tracking-tight">
+              <div className="text-xl sm:text-2xl font-black text-slate-900 font-mono tracking-tight">
                 {metrics.total.toLocaleString()}
               </div>
-              <div className="text-[10px] text-emerald-400 font-semibold mt-1 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <div className="text-[10px] text-orange-700 font-bold mt-1 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-orange-500 inline-block" />
                 Master Database
               </div>
             </div>
@@ -454,35 +455,35 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, beneficiar
             {/* Badge 2: Unique Job Cards */}
             <div 
               id="login-badge-cards"
-              className="group relative rounded-2xl bg-gradient-to-b from-slate-800/80 to-slate-900/90 border border-slate-700/70 p-3.5 shadow-lg backdrop-blur-md transition-all duration-300 hover:border-amber-500/50 hover:shadow-amber-500/10 cursor-default"
+              className="relative rounded-2xl bg-white/95 border border-orange-200/90 p-3.5 shadow-xs transition-all hover:border-amber-400 hover:shadow-md cursor-default"
             >
-              <div className="flex items-center justify-between text-slate-400 mb-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider">Job Cards</span>
-                <CreditCard className="w-3.5 h-3.5 text-amber-400" />
+              <div className="flex items-center justify-between text-slate-600 mb-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider">অনন্য জব কার্ড</span>
+                <CreditCard className="w-3.5 h-3.5 text-amber-600" />
               </div>
-              <div className="text-xl sm:text-2xl font-black text-white font-mono tracking-tight">
+              <div className="text-xl sm:text-2xl font-black text-slate-900 font-mono tracking-tight">
                 {metrics.uniqueJobCards.toLocaleString()}
               </div>
-              <div className="text-[10px] text-amber-300 font-semibold mt-1 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-                Families Registered
+              <div className="text-[10px] text-amber-800 font-bold mt-1 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
+                পরিবার রেজিস্টার্ড
               </div>
             </div>
 
             {/* Badge 3: e-KYC Done */}
             <div 
               id="login-badge-kyc-done"
-              className="group relative rounded-2xl bg-gradient-to-b from-slate-800/80 to-slate-900/90 border border-slate-700/70 p-3.5 shadow-lg backdrop-blur-md transition-all duration-300 hover:border-teal-500/50 hover:shadow-teal-500/10 cursor-default"
+              className="relative rounded-2xl bg-white/95 border border-emerald-200/90 p-3.5 shadow-xs transition-all hover:border-emerald-400 hover:shadow-md cursor-default"
             >
-              <div className="flex items-center justify-between text-slate-400 mb-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider">e-KYC Done</span>
-                <CheckCircle2 className="w-3.5 h-3.5 text-teal-400" />
+              <div className="flex items-center justify-between text-slate-600 mb-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider">e-KYC সম্পন্ন</span>
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
               </div>
-              <div className="text-xl sm:text-2xl font-black text-teal-300 font-mono tracking-tight">
+              <div className="text-xl sm:text-2xl font-black text-emerald-700 font-mono tracking-tight">
                 {metrics.done.toLocaleString()}
               </div>
-              <div className="text-[10px] text-teal-400 font-bold mt-1 flex items-center gap-1">
-                <span className="px-1.5 py-0.2 rounded bg-teal-500/20 text-teal-300">
+              <div className="text-[10px] text-emerald-800 font-bold mt-1 flex items-center gap-1">
+                <span className="px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 font-bold">
                   {metrics.donePct}% Ratio
                 </span>
               </div>
@@ -491,102 +492,113 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, beneficiar
             {/* Badge 4: e-KYC Pending */}
             <div 
               id="login-badge-kyc-pending"
-              className="group relative rounded-2xl bg-gradient-to-b from-slate-800/80 to-slate-900/90 border border-slate-700/70 p-3.5 shadow-lg backdrop-blur-md transition-all duration-300 hover:border-rose-500/50 hover:shadow-rose-500/10 cursor-default"
+              className="relative rounded-2xl bg-white/95 border border-rose-200/90 p-3.5 shadow-xs transition-all hover:border-rose-400 hover:shadow-md cursor-default"
             >
-              <div className="flex items-center justify-between text-slate-400 mb-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider">e-KYC Pending</span>
-                <AlertCircle className="w-3.5 h-3.5 text-rose-400" />
+              <div className="flex items-center justify-between text-slate-600 mb-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider">e-KYC বাকি</span>
+                <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
               </div>
-              <div className="text-xl sm:text-2xl font-black text-rose-300 font-mono tracking-tight">
+              <div className="text-xl sm:text-2xl font-black text-rose-700 font-mono tracking-tight">
                 {metrics.pending.toLocaleString()}
               </div>
-              <div className="text-[10px] text-rose-400 font-semibold mt-1">
-                Field Action Needed
+              <div className="text-[10px] text-rose-700 font-bold mt-1">
+                ফিল্ড ভেরিফিকেশন
               </div>
             </div>
 
             {/* Badge 5: ABPS Enabled */}
             <div 
               id="login-badge-abps"
-              className="group relative rounded-2xl bg-gradient-to-b from-slate-800/80 to-slate-900/90 border border-slate-700/70 p-3.5 shadow-lg backdrop-blur-md transition-all duration-300 hover:border-sky-500/50 hover:shadow-sky-500/10 cursor-default"
+              className="relative rounded-2xl bg-white/95 border border-sky-200/90 p-3.5 shadow-xs transition-all hover:border-sky-400 hover:shadow-md cursor-default"
             >
-              <div className="flex items-center justify-between text-slate-400 mb-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider">ABPS Ready</span>
-                <Sparkles className="w-3.5 h-3.5 text-sky-400" />
+              <div className="flex items-center justify-between text-slate-600 mb-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider">ABPS সক্রিয়</span>
+                <Sparkles className="w-3.5 h-3.5 text-sky-600" />
               </div>
-              <div className="text-xl sm:text-2xl font-black text-sky-300 font-mono tracking-tight">
+              <div className="text-xl sm:text-2xl font-black text-sky-700 font-mono tracking-tight">
                 {metrics.abps.toLocaleString()}
               </div>
-              <div className="text-[10px] text-sky-400 font-bold mt-1 flex items-center gap-1">
-                <span className="px-1.5 py-0.2 rounded bg-sky-500/20 text-sky-300">
-                  {metrics.abpsPct}% Ratio
+              <div className="text-[10px] text-sky-800 font-bold mt-1 flex items-center gap-1">
+                <span className="px-1.5 py-0.2 rounded bg-sky-100 text-sky-800">
+                  {metrics.abpsPct}% DBT Ready
                 </span>
-                <span>DBT Ready</span>
               </div>
             </div>
 
             {/* Badge 6: Villages & Sansads */}
             <div 
               id="login-badge-villages"
-              className="group relative rounded-2xl bg-gradient-to-b from-slate-800/80 to-slate-900/90 border border-slate-700/70 p-3.5 shadow-lg backdrop-blur-md transition-all duration-300 hover:border-purple-500/50 hover:shadow-purple-500/10 cursor-default"
+              className="relative rounded-2xl bg-white/95 border border-purple-200/90 p-3.5 shadow-xs transition-all hover:border-purple-400 hover:shadow-md cursor-default"
             >
-              <div className="flex items-center justify-between text-slate-400 mb-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider">Coverage</span>
-                <MapPin className="w-3.5 h-3.5 text-purple-400" />
+              <div className="flex items-center justify-between text-slate-600 mb-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider">এলাকা কভারেজ</span>
+                <MapPin className="w-3.5 h-3.5 text-purple-600" />
               </div>
-              <div className="text-xl sm:text-2xl font-black text-purple-300 font-mono tracking-tight">
+              <div className="text-xl sm:text-2xl font-black text-purple-800 font-mono tracking-tight">
                 29 / 16
               </div>
-              <div className="text-[10px] text-purple-300 font-semibold mt-1">
-                Villages & Sansads
+              <div className="text-[10px] text-purple-700 font-bold mt-1">
+                গ্রাম ও সংসদ
               </div>
             </div>
           </div>
         </section>
 
         {/* =====================================================================
-            3D DYNAMIC OFFICIAL LOGIN CARD
+            SOLID OFFICIAL LOGIN CARD (Fixed, No Wobbling, Official Logos, Light Gerua)
             ===================================================================== */}
-        <div className="max-w-xl mx-auto w-full" style={{ perspective: '1200px' }}>
-          <div
-            onMouseMove={handleMouseMove}
-            onMouseLeave={handleMouseLeave}
-            style={{
-              transform: `rotateX(${rotateX}deg) rotateY(${rotateY}deg)`,
-              transition: 'transform 0.15s ease-out'
-            }}
-            className="rounded-3xl bg-gradient-to-b from-slate-900/95 via-slate-900/90 to-slate-950/95 border-2 border-emerald-500/30 p-6 sm:p-9 shadow-[0_25px_60px_-15px_rgba(16,185,129,0.25)] backdrop-blur-xl relative overflow-hidden"
-          >
-            {/* Top 3D Metallic Edge Highlight */}
-            <div className="h-1.5 w-full bg-gradient-to-r from-emerald-500 via-teal-400 to-emerald-500 absolute top-0 left-0" />
+        <div className="max-w-xl mx-auto w-full">
+          <div className="rounded-3xl bg-white/95 border-2 border-orange-300 p-6 sm:p-9 shadow-[0_20px_50px_rgba(249,115,22,0.12)] relative overflow-hidden">
+            {/* Top Saffron Ribbon */}
+            <div className="h-2 w-full bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 absolute top-0 left-0" />
 
-            {/* Glowing GP Seal Badge */}
-            <div className="flex flex-col items-center text-center mb-6">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-700 text-white flex items-center justify-center shadow-lg shadow-emerald-500/30 border border-emerald-400/40 mb-3">
-                <ShieldCheck className="w-9 h-9 text-emerald-100" />
+            {/* Inactivity / Tab Closure Notification Banner */}
+            {logoutNotice && (
+              <div className="mb-5 p-3.5 rounded-xl bg-amber-50 border-2 border-amber-300 text-amber-950 text-xs flex items-start gap-2.5 shadow-xs">
+                <AlertCircle className="w-4 h-4 text-orange-600 shrink-0 mt-0.5" />
+                <span className="font-bold leading-relaxed">{logoutNotice}</span>
               </div>
-              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+            )}
+
+            {/* Official Header with Dual Logos */}
+            <div className="flex flex-col items-center text-center mb-6">
+              <div className="flex items-center justify-center gap-3.5 mb-3">
+                <div className="p-1 bg-white border border-amber-200 rounded-xl shadow-xs">
+                  <NationalEmblemLogo size={36} className="text-slate-800" />
+                </div>
+                <div className="p-1 bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-orange-300 rounded-2xl shadow-sm">
+                  <BathuaryGramPanchayatOfficialLogo size={58} />
+                </div>
+                <div className="p-1 bg-white border border-amber-200 rounded-xl shadow-xs">
+                  <VbGramGActLogo size={46} />
+                </div>
+              </div>
+
+              <h1 className="text-xl sm:text-2xl font-black text-slate-950 tracking-tight">
                 অফিসিয়াল অ্যাডমিন লগইন
               </h1>
-              <p className="text-xs text-emerald-400 font-bold mt-1 tracking-wider uppercase">
-                Official GP Officer Authentication Portal
+              <p className="text-xs text-orange-700 font-black mt-1 tracking-wider uppercase">
+                BATHUARY GRAM PANCHAYAT OFFICIAL GATEWAY
               </p>
-              <p className="text-xs text-slate-400 mt-1 max-w-sm">
-                বাথুয়ারী গ্রাম পঞ্চায়েত ১০০ দিনের কাজ ও আধার e-KYC প্রশাসন পোর্টাল
+              <p className="text-xs text-slate-600 mt-1 max-w-sm font-medium">
+                বাথুয়ারী গ্রাম পঞ্চায়েত • ১২৫ দিনের কাজ ও আধার e-KYC প্রশাসন পোর্টাল
               </p>
+              <div className="text-[11px] text-amber-900 font-semibold mt-0.5">
+                Egra-II Development Block • Purba Medinipur
+              </div>
             </div>
 
             {/* Notifications */}
             {errorMessage && (
-              <div className="mb-5 p-3.5 rounded-xl bg-rose-500/15 border border-rose-500/40 text-rose-200 text-xs flex items-start gap-2.5 animate-shake">
-                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+              <div className="mb-5 p-3.5 rounded-xl bg-rose-50 border border-rose-300 text-rose-800 text-xs flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                 <span className="font-semibold">{errorMessage}</span>
               </div>
             )}
 
             {successMessage && (
-              <div className="mb-5 p-3.5 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-200 text-xs flex items-center gap-2.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <div className="mb-5 p-3.5 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs flex items-center gap-2.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                 <span className="font-bold">{successMessage}</span>
               </div>
             )}
@@ -595,12 +607,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, beneficiar
             <form onSubmit={handleLogin} className="space-y-4">
               {/* Username Field */}
               <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                   অফিসিয়াল ইউজার আইডি (Username)
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <UserCheck className="w-4 h-4 text-emerald-400" />
+                    <UserCheck className="w-4 h-4 text-orange-600" />
                   </div>
                   <input
                     id="login-username-input"
@@ -609,15 +621,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, beneficiar
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     placeholder="BATHUARY_002"
-                    className="w-full pl-10 pr-4 py-3 bg-slate-800/80 border border-slate-700 rounded-xl text-white font-mono font-bold text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 shadow-inner uppercase tracking-wider transition-all"
+                    className="w-full pl-10 pr-4 py-3 bg-orange-50/40 border border-orange-200 rounded-xl text-slate-900 font-mono font-bold text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 focus:bg-white shadow-xs uppercase tracking-wider transition-all"
                   />
                 </div>
-                <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1">
-                  <span>Official Authorized ID: <strong className="text-emerald-400">BATHUARY_002</strong></span>
+                <div className="flex items-center justify-between text-[11px] text-slate-600 mt-1">
+                  <span>Official Authorized ID: <strong className="text-orange-700">BATHUARY_002</strong></span>
                   <button
                     type="button"
                     onClick={() => setUsername('BATHUARY_002')}
-                    className="text-[10px] text-teal-300 hover:text-teal-200 underline font-semibold cursor-pointer"
+                    className="text-[10px] text-orange-700 hover:text-orange-900 underline font-bold cursor-pointer"
                   >
                     Auto-Fill
                   </button>
@@ -627,13 +639,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, beneficiar
               {/* Password Field */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
                     পাসওয়ার্ড (Password)
                   </label>
                   <button
                     type="button"
                     onClick={() => setIsChangePasswordOpen(true)}
-                    className="text-[11px] text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                    className="text-[11px] text-orange-700 hover:text-orange-900 font-bold flex items-center gap-1 cursor-pointer transition-colors"
                   >
                     <KeyRound className="w-3 h-3" />
                     পাসওয়ার্ড পরিবর্তন? (Change Password)
@@ -641,7 +653,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, beneficiar
                 </div>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <Lock className="w-4 h-4 text-emerald-400" />
+                    <Lock className="w-4 h-4 text-orange-600" />
                   </div>
                   <input
                     id="login-password-input"
@@ -650,22 +662,22 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, beneficiar
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••••••"
-                    className="w-full pl-10 pr-11 py-3 bg-slate-800/80 border border-slate-700 rounded-xl text-white font-mono font-bold text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 shadow-inner tracking-wider transition-all"
+                    className="w-full pl-10 pr-11 py-3 bg-orange-50/40 border border-orange-200 rounded-xl text-slate-900 font-mono font-bold text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 focus:bg-white shadow-xs tracking-wider transition-all"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-white cursor-pointer transition-colors"
+                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-500 hover:text-slate-800 cursor-pointer transition-colors"
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
-                <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1">
-                  <span>Official Authorized Password: <strong className="text-emerald-400 font-mono">Bathuary@2580</strong></span>
+                <div className="flex items-center justify-between text-[11px] text-slate-600 mt-1">
+                  <span>Official Authorized Password: <strong className="text-orange-700 font-mono">Bathuary@2580</strong></span>
                   <button
                     type="button"
                     onClick={() => setPassword('Bathuary@2580')}
-                    className="text-[10px] text-teal-300 hover:text-teal-200 underline font-semibold cursor-pointer"
+                    className="text-[10px] text-orange-700 hover:text-orange-900 underline font-bold cursor-pointer"
                   >
                     Auto-Fill
                   </button>
@@ -677,17 +689,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, beneficiar
                 id="login-submit-btn"
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-[0_10px_25px_-5px_rgba(16,185,129,0.4)] hover:shadow-[0_15px_30px_-5px_rgba(16,185,129,0.6)] active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed mt-2"
+                className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-orange-600 via-amber-600 to-orange-600 hover:from-orange-700 hover:to-amber-700 text-white font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-[0_10px_25px_-5px_rgba(234,88,12,0.35)] hover:shadow-[0_15px_30px_-5px_rgba(234,88,12,0.5)] active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed mt-2"
               >
                 {isLoading ? (
                   <>
-                    <RefreshCw className="w-4 h-4 animate-spin text-slate-950" />
+                    <RefreshCw className="w-4 h-4 animate-spin text-white" />
                     <span>যাচাই করা হচ্ছে (Verifying)...</span>
                   </>
                 ) : (
                   <>
                     <span>পোর্টালে লগইন করুন • LOGIN TO PORTAL</span>
-                    <ArrowRight className="w-4 h-4 text-slate-950" />
+                    <ArrowRight className="w-4 h-4 text-white" />
                   </>
                 )}
               </button>
@@ -700,37 +712,37 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, beneficiar
           PASSWORD CHANGE MODAL
           ===================================================================== */}
       {isChangePasswordOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-3xl bg-slate-900 border-2 border-emerald-500/40 p-6 sm:p-7 shadow-2xl relative text-slate-100 animate-in fade-in zoom-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-3xl bg-white border-2 border-orange-300 p-6 sm:p-7 shadow-2xl relative text-slate-900 animate-in fade-in zoom-in duration-200">
             {/* Modal Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-5">
+            <div className="flex items-center justify-between pb-4 border-b border-orange-100 mb-5">
               <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
+                <div className="w-10 h-10 rounded-xl bg-orange-100 text-orange-700 flex items-center justify-center border border-orange-200">
                   <KeyRound className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-black text-white">পাসওয়ার্ড পরিবর্তন করুন</h3>
-                  <p className="text-xs text-slate-400">Change Official Login Password</p>
+                  <h3 className="text-base font-black text-slate-900">পাসওয়ার্ড পরিবর্তন করুন</h3>
+                  <p className="text-xs text-slate-600">Change Official Login Password</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsChangePasswordOpen(false)}
-                className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {changePasswordError && (
-              <div className="mb-4 p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+              <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-300 text-rose-800 text-xs flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>{changePasswordError}</span>
               </div>
             )}
 
             {changePasswordSuccess && (
-              <div className="mb-4 p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
+              <div className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 shrink-0" />
                 <span>{changePasswordSuccess}</span>
               </div>
@@ -738,7 +750,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, beneficiar
 
             <form onSubmit={handleChangePassword} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                   বর্তমান পাসওয়ার্ড (Current Password)
                 </label>
                 <input
@@ -747,12 +759,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, beneficiar
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   placeholder="Bathuary@2580"
-                  className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  className="w-full px-3.5 py-2.5 bg-orange-50/40 border border-orange-200 rounded-xl text-slate-900 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                   নতুন পাসওয়ার্ড (New Password)
                 </label>
                 <div className="relative">
@@ -762,12 +774,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, beneficiar
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="কমপক্ষে ৬ অক্ষর (Min 6 characters)"
-                    className="w-full pl-3.5 pr-10 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                    className="w-full pl-3.5 pr-10 py-2.5 bg-orange-50/40 border border-orange-200 rounded-xl text-slate-900 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   />
                   <button
                     type="button"
                     onClick={() => setShowNewPassword(!showNewPassword)}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-white cursor-pointer"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-700 cursor-pointer"
                   >
                     {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -775,7 +787,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, beneficiar
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                   কনফার্ম নতুন পাসওয়ার্ড (Confirm New Password)
                 </label>
                 <input
@@ -784,22 +796,22 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, beneficiar
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="নতুন পাসওয়ার্ডটি পুনরায় লিখুন"
-                  className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white font-mono text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  className="w-full px-3.5 py-2.5 bg-orange-50/40 border border-orange-200 rounded-xl text-slate-900 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-orange-100">
                 <button
                   type="button"
                   onClick={() => setIsChangePasswordOpen(false)}
-                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs cursor-pointer transition-colors"
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer transition-colors"
                 >
                   বাতিল (Cancel)
                 </button>
                 <button
                   type="submit"
                   disabled={changePasswordLoading}
-                  className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs uppercase tracking-wider cursor-pointer shadow-md disabled:opacity-50 flex items-center gap-2"
+                  className="px-5 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-black text-xs uppercase tracking-wider cursor-pointer shadow-md disabled:opacity-50 flex items-center gap-2"
                 >
                   {changePasswordLoading ? (
                     <>
@@ -817,13 +829,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, beneficiar
       )}
 
       {/* Footer */}
-      <footer className="px-4 sm:px-8 py-3.5 border-t border-slate-800/80 bg-slate-950/70 text-center text-xs text-slate-400">
+      <footer className="px-4 sm:px-8 py-3.5 border-t border-orange-200/80 bg-white/85 text-center text-xs text-slate-700">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
           <span>
             © 2026 বাথুয়ারী গ্রাম পঞ্চায়েত • মহাত্মা গান্ধী জাতীয় গ্রামীণ কর্মসংস্থান নিশ্চয়তা প্রকল্প (MGNREGA)
           </span>
-          <span className="text-[11px] text-emerald-400 font-mono">
-            Secure Session Gateway • Purba Medinipur, West Bengal
+          <span className="text-[11px] text-orange-700 font-bold font-mono">
+            Secure Session Gateway • Egra-II Block, Purba Medinipur, West Bengal
           </span>
         </div>
       </footer>

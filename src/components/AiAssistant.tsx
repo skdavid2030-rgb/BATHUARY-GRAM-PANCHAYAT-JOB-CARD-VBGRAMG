@@ -366,7 +366,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
 
     if (lower.includes('abps') || lower.includes('এবিপিএস') || lower.includes('payment') || lower.includes('মজুরি') || lower.includes('wage')) {
       if (isBengali) {
-        return `ABPS (Aadhaar Based Payment System) সক্রিয় করার নির্দেশিকা:\n১. উপভোক্তার ১২ সংখ্যার আধার নম্বর জব কার্ডে সিড থাকতে হবে।\n২. উপভোক্তার ব্যাংক একাউন্টে আধার লিঙ্ক ও NPCI (National Payments Corporation of India) ম্যাপারে সক্রিয় (Active DBT) থাকতে হবে।\n৩. যদি ব্যাংকে আধার লিঙ্ক না থাকে, তবে অবিলম্বে ব্যাংক শাখায় 'Aadhaar NPCI Mapping Consent Form' জমা দিতে হবে যাতে ১০০ দিনের কাজের মজুরি সরাসরি অ্যাকাউন্টে জমা হতে পারে।`;
+        return `ABPS (Aadhaar Based Payment System) সক্রিয় করার নির্দেশিকা:\n১. উপভোক্তার ১২ সংখ্যার আধার নম্বর জব কার্ডে সিড থাকতে হবে।\n২. উপভোক্তার ব্যাংক একাউন্টে আধার লিঙ্ক ও NPCI (National Payments Corporation of India) ম্যাপারে সক্রিয় (Active DBT) থাকতে হবে।\n৩. যদি ব্যাংকে আধার লিঙ্ক না থাকে, তবে অবিলম্বে ব্যাংক শাখায় 'Aadhaar NPCI Mapping Consent Form' জমা দিতে হবে যাতে ১২৫ দিনের কাজের মজুরি সরাসরি অ্যাকাউন্টে জমা হতে পারে।`;
       }
       return `ABPS (Aadhaar Based Payment System) Guidelines:\n1. 12-digit Aadhaar UID must be seeded to the Job Card.\n2. Beneficiary bank account must have Aadhaar seeded and active on NPCI DBT Mapper.\n3. If not enabled, visit the bank branch with Aadhaar and passbook to submit the Aadhaar NPCI Mapping Consent Form.`;
     }
@@ -525,8 +525,8 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Panel 1: AI Data Quality & Compliance Auditor */}
-        <div className="rounded-3xl bg-gradient-to-br from-white via-slate-50 to-emerald-50/20 border-2 border-slate-200 p-6 sm:p-7 shadow-sm flex flex-col justify-between relative overflow-hidden">
-          <div className="h-1.5 w-full bg-gradient-to-r from-teal-500 to-emerald-500 absolute top-0 left-0" />
+        <div className="rounded-3xl bg-[#FFFDFB] border-2 border-amber-200/90 p-6 sm:p-7 shadow-sm flex flex-col justify-between relative overflow-hidden">
+          <div className="h-1.5 w-full bg-gradient-to-r from-orange-500 via-amber-400 to-emerald-500 absolute top-0 left-0" />
           
           <div>
             <div className="flex items-center justify-between gap-3 mb-5 border-b border-slate-200/80 pb-3.5">
@@ -724,8 +724,8 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
         </div>
 
         {/* Panel 2: Interactive AI Assistant Chat */}
-        <div className="rounded-3xl bg-gradient-to-br from-white via-slate-50 to-indigo-50/20 border-2 border-slate-200 p-6 sm:p-7 shadow-sm flex flex-col h-[650px] relative overflow-hidden">
-          <div className="h-1.5 w-full bg-gradient-to-r from-indigo-500 to-blue-500 absolute top-0 left-0" />
+        <div className="rounded-3xl bg-[#FFFDFB] border-2 border-amber-200/90 p-6 sm:p-7 shadow-sm flex flex-col h-[650px] relative overflow-hidden">
+          <div className="h-1.5 w-full bg-gradient-to-r from-orange-500 via-amber-400 to-indigo-500 absolute top-0 left-0" />
           
           {/* Header */}
           <div className="flex items-center justify-between gap-3 mb-3.5 border-b border-slate-200/80 pb-3.5">

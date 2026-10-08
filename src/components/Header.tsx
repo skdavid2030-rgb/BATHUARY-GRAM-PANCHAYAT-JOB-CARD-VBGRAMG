@@ -91,7 +91,7 @@ export const Header: React.FC<HeaderProps> = ({
   const TabIcon = tabConfig.icon;
 
   return (
-    <header className="sticky top-0 z-30 bg-white border-b border-slate-200 shadow-sm transition-all no-print">
+    <header className="sticky top-0 z-30 bg-[#FFFDFB] border-b border-amber-200/80 shadow-xs transition-all no-print">
       {/* Top Colorful Animated Shimmer Strip */}
       <div className="h-1 w-full bg-gradient-to-r from-emerald-400 via-teal-400 via-sky-400 via-indigo-500 via-purple-500 via-pink-500 to-amber-400 animate-gradient-shift" />
 
@@ -202,7 +202,7 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Main Bar: Vibrant Header with Breadcrumb & Village Stats */}
-      <div className="px-4 sm:px-6 py-2.5 bg-gradient-to-r from-slate-50 via-emerald-50/20 to-blue-50/30 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100">
+      <div className="px-4 sm:px-6 py-2.5 bg-gradient-to-r from-[#FFF8EE] via-[#FFF3E3] to-[#FFEEdb] flex flex-wrap items-center justify-between gap-3 border-t border-amber-200/50">
         <div className="flex items-center gap-3">
           {/* Mobile Sidebar Trigger */}
           <button

@@ -21,6 +21,7 @@ import confetti from 'canvas-confetti';
 import { BeneficiaryRow, BankMasterItem, AppUser } from '../types';
 import { VILLAGES_LIST, OFFICERS_LIST, canonicalizeBankName, LEGACY_IFSC_UPGRADE_MAP } from '../data/bankMaster';
 import { formatKycDate } from '../utils/dateFormatter';
+import { normalizeJobCardBookDelivered } from '../utils/jobCardDeliveryNormalizer';
 
 interface DataUpdateFormProps {
   beneficiaries: BeneficiaryRow[];
@@ -299,49 +300,13 @@ export const DataUpdateForm: React.FC<DataUpdateFormProps> = ({
     setAadhaarSearch(match.colP || match.colQ || match.colH || '');
     setIsAadhaarOpen(false);
 
-    // Normalize Bank details (fix branch vs IFSC if inverted)
-    let resolvedIfsc = (match.colAP || '').trim().toUpperCase();
-    let resolvedBranch = (match.colAQ || '').trim().toUpperCase();
-    let resolvedBank = (match.colAO || '').trim().toUpperCase();
+    // Exactly mirror Google Sheet bank details: if blank, stay 100% BLANK
+    const resolvedBank = (match.colAO || '').trim();
+    const resolvedIfsc = (match.colAP || '').trim();
+    const resolvedBranch = (match.colAQ || '').trim();
+    const resolvedAccount = (match.colAR || '').trim();
 
-    const isBranchAnIfsc = /^[A-Z]{4}0[A-Z0-9]{6}$/.test(resolvedBranch) || bankMaster.some(b => b.ifsc.toUpperCase() === resolvedBranch);
-    const isIfscABranch = resolvedIfsc.includes('BRANCH') || resolvedIfsc.includes('MAIN') || resolvedIfsc.includes('BAZAR') || resolvedIfsc.includes('RURAL') || resolvedIfsc.includes('MIDNAPORE');
-
-    if (isBranchAnIfsc || isIfscABranch) {
-      const temp = resolvedIfsc;
-      resolvedIfsc = resolvedBranch;
-      resolvedBranch = temp;
-    }
-
-    // Auto-upgrade legacy merged IFSC (e.g. ALLA0212824 -> IDIB000E503, UTBI0EGR276 -> PUNB0019020)
-    if (LEGACY_IFSC_UPGRADE_MAP[resolvedIfsc]) {
-      const up = LEGACY_IFSC_UPGRADE_MAP[resolvedIfsc];
-      resolvedIfsc = up.newIfsc;
-      resolvedBank = up.newBank;
-      if (!resolvedBranch || resolvedBranch === '—') resolvedBranch = up.branch;
-      setMergerNotice(`Legacy IFSC recognized (${up.reason}): Auto-updated to ${up.newBank} (IFSC: ${up.newIfsc}, Branch: ${up.branch})`);
-    } else {
-      setMergerNotice('');
-    }
-
-    // Canonicalize Bank name (e.g. IPPB / INDIAN POST -> INDIA POST PAYMENTS BANK, SBI -> STATE BANK OF INDIA)
-    if (resolvedBank) {
-      resolvedBank = canonicalizeBankName(resolvedBank);
-    }
-
-    // Auto-fill from bankMaster if IFSC is recognized
-    const matchedBank = bankMaster.find(b => b.ifsc.toUpperCase() === resolvedIfsc);
-    if (matchedBank) {
-      if (!resolvedBank || resolvedBank === '—') resolvedBank = matchedBank.bank;
-      if (!resolvedBranch || resolvedBranch === '—') {
-        resolvedBranch = matchedBank.branch;
-      }
-    }
-
-    // If IPPB and branch is missing, set default Bathuary/Egra branch
-    if (resolvedBank === 'INDIA POST PAYMENTS BANK' && (!resolvedBranch || resolvedBranch === '—' || resolvedBranch.includes('PROCESSING'))) {
-      resolvedBranch = 'BATHUARY BO';
-    }
+    setMergerNotice('');
 
     const formattedKyc = formatKycDate(match.colS);
 
@@ -355,26 +320,32 @@ export const DataUpdateForm: React.FC<DataUpdateFormProps> = ({
       colV: match.colV || '',
       colW: match.colW || '',
       colX: match.colX || '',
-      colY: (match.colY === 'Yes' || match.colY === 'Y' || match.colY === 'হ্যাঁ') ? 'Yes' : 'No',
+      colY: (normalizeJobCardBookDelivered(match.colY) === 'Yes') ? 'Yes' : 'No',
       colAO: resolvedBank,
       colAP: resolvedIfsc,
       colAQ: resolvedBranch,
-      colAR: match.colAR || '',
-      colAR_confirm: match.colAR || ''
+      colAR: resolvedAccount,
+      colAR_confirm: resolvedAccount
     });
-  }, [bankMaster, currentUser]);
+  }, [currentUser]);
 
-  // Sync selected record when Applicant changes
+  // Sync selected record when Applicant changes or resets
   useEffect(() => {
     if (selectedJobCard && selectedApplicant) {
       const match = beneficiaries.find(b => b.colH === selectedJobCard && b.colJ === selectedApplicant);
       if (match) {
         populateRecordToForm(match);
+      } else {
+        setActiveRow(null);
       }
-    } else if (!activeRow) {
+    } else if (!selectedJobCard) {
       setActiveRow(null);
+      setFormData({
+        colP: '', colQ: '', colR: '', colS: '', colT: '', colU: '', colV: '', colW: '', colX: '', colY: 'No',
+        colAO: '', colAP: '', colAQ: '', colAR: '', colAR_confirm: ''
+      });
     }
-  }, [selectedJobCard, selectedApplicant, beneficiaries, populateRecordToForm, activeRow]);
+  }, [selectedJobCard, selectedApplicant, beneficiaries, populateRecordToForm]);
 
   // Selection handlers
   const handleSelectJobCardMatch = (cardNo: string, applicantName?: string) => {
@@ -384,14 +355,19 @@ export const DataUpdateForm: React.FC<DataUpdateFormProps> = ({
     const applicants = Array.from(new Set(beneficiaries.filter(b => b.colH === cardNo).map(b => b.colJ).filter(Boolean)));
     if (applicantName) {
       setSelectedApplicant(applicantName);
-    } else if (applicants.length === 1) {
-      setSelectedApplicant(applicants[0]);
+    } else if (applicants.length > 0) {
+      // Auto-select Head of Household or first applicant so the form loads immediately
+      const hohRow = beneficiaries.find(b => b.colH === cardNo && b.colJ && b.colJ === b.colAG);
+      setSelectedApplicant(hohRow ? hohRow.colJ : applicants[0]);
     } else {
       setSelectedApplicant('');
     }
   };
 
   const handleSelectAadhaarMatch = (b: BeneficiaryRow) => {
+    setSelectedJobCard(b.colH);
+    setJobCardSearch(b.colH);
+    setSelectedApplicant(b.colJ);
     populateRecordToForm(b);
   };
 
@@ -424,12 +400,25 @@ export const DataUpdateForm: React.FC<DataUpdateFormProps> = ({
   const handleJobCardInputChange = (val: string) => {
     setJobCardSearch(val);
     setIsJobCardOpen(true);
-    const exact = beneficiaries.find(b => b.colH && b.colH.toUpperCase() === val.trim().toUpperCase());
+    const clean = val.trim().toUpperCase();
+    if (!clean) {
+      setSelectedJobCard('');
+      setSelectedApplicant('');
+      setActiveRow(null);
+      setFormData({
+        colP: '', colQ: '', colR: '', colS: '', colT: '', colU: '', colV: '', colW: '', colX: '', colY: 'No',
+        colAO: '', colAP: '', colAQ: '', colAR: '', colAR_confirm: ''
+      });
+      return;
+    }
+
+    const exact = beneficiaries.find(b => b.colH && b.colH.toUpperCase() === clean);
     if (exact) {
       setSelectedJobCard(exact.colH);
       const applicants = Array.from(new Set(beneficiaries.filter(b => b.colH === exact.colH).map(b => b.colJ).filter(Boolean)));
-      if (applicants.length === 1) {
-        setSelectedApplicant(applicants[0]);
+      if (applicants.length > 0) {
+        const hohRow = beneficiaries.find(b => b.colH === exact.colH && b.colJ && b.colJ === b.colAG);
+        setSelectedApplicant(hohRow ? hohRow.colJ : applicants[0]);
       }
     }
   };
@@ -680,8 +669,8 @@ export const DataUpdateForm: React.FC<DataUpdateFormProps> = ({
   return (
     <div className="space-y-6">
       {/* Top Search & Select Controls with Colorful Gradient Border */}
-      <div className="rounded-3xl bg-gradient-to-br from-white via-slate-50 to-emerald-50/20 border-2 border-slate-200 p-6 sm:p-8 shadow-sm relative overflow-visible">
-        <div className="h-1.5 w-full bg-gradient-to-r from-emerald-500 via-teal-500 to-indigo-500 absolute top-0 left-0 rounded-t-3xl" />
+      <div className="rounded-3xl bg-gradient-to-br from-[#FFFDFB] via-[#FFF8EE] to-[#FFF1DF] border-2 border-amber-200/90 p-6 sm:p-8 shadow-sm relative overflow-visible">
+        <div className="h-2 w-full bg-gradient-to-r from-orange-500 via-amber-400 via-emerald-400 to-teal-400 absolute top-0 left-0 rounded-t-3xl" />
         
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 border-b border-slate-200/80 pb-4">
           <div className="flex items-center gap-3.5">
@@ -1034,8 +1023,8 @@ export const DataUpdateForm: React.FC<DataUpdateFormProps> = ({
           </div>
 
           {/* Section 1: Read Only Information (Col A - Col O, AF, AG) */}
-          <div className="rounded-3xl bg-gradient-to-br from-white to-blue-50/20 border-2 border-slate-200 p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-4 border-b border-slate-200/80 pb-3">
+          <div className="rounded-3xl bg-[#FFFDFB] border-2 border-amber-200/90 p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-4 border-b border-amber-100 pb-3">
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full bg-indigo-600 ring-4 ring-indigo-100" />
                 <h4 className="text-sm sm:text-base font-black text-slate-900">
@@ -1063,6 +1052,10 @@ export const DataUpdateForm: React.FC<DataUpdateFormProps> = ({
               <ReadOnlyField label="Aadhaar Seeded in NREGASoft (M)" value={activeRow.colM} />
               <ReadOnlyField label="Demographic Auth Done (N)" value={activeRow.colN} />
               <ReadOnlyField label="Enables for ABPS? (O)" value={activeRow.colO} highlight />
+              <ReadOnlyField label="Sheet Bank Name (Col AO)" value={activeRow.colAO || '— (শীটে নেই / Blank)'} />
+              <ReadOnlyField label="Sheet IFSC Code (Col AP)" value={activeRow.colAP || '— (শীটে নেই / Blank)'} />
+              <ReadOnlyField label="Sheet Branch Name (Col AQ)" value={activeRow.colAQ || '— (শীটে নেই / Blank)'} />
+              <ReadOnlyField label="Sheet Account No (Col AR)" value={activeRow.colAR || '— (শীটে নেই / Blank)'} highlight={Boolean(activeRow.colAR)} />
             </div>
           </div>
 
@@ -1268,9 +1261,31 @@ export const DataUpdateForm: React.FC<DataUpdateFormProps> = ({
                   Bank Account & ABPS Details (Col AO - Col AR)
                 </h4>
               </div>
-              <span className="text-[11px] font-black text-amber-800 bg-amber-100/70 px-3 py-1 rounded-full border border-amber-300">
-                RBI & WB Master Verified
-              </span>
+              <div className="flex items-center gap-2">
+                {(formData.colAO || formData.colAP || formData.colAQ || formData.colAR) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData(prev => ({
+                        ...prev,
+                        colAO: '',
+                        colAP: '',
+                        colAQ: '',
+                        colAR: '',
+                        colAR_confirm: ''
+                      }));
+                      setMergerNotice('');
+                    }}
+                    className="text-[11px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 px-2.5 py-1 rounded-full border border-rose-300 transition-colors cursor-pointer"
+                    title="Clear bank details to blank"
+                  >
+                    ✕ ফাঁকা করুন (Clear to Blank)
+                  </button>
+                )}
+                <span className="text-[11px] font-black text-amber-800 bg-amber-100/70 px-3 py-1 rounded-full border border-amber-300">
+                  RBI & WB Master Verified
+                </span>
+              </div>
             </div>
 
             {mergerNotice && (

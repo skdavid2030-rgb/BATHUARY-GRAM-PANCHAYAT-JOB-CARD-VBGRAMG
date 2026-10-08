@@ -267,13 +267,19 @@ export const PrintSlipModal: React.FC<PrintSlipModalProps> = ({
                 </div>
               )}
               <p className="font-bold text-slate-700">Generated: {new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</p>
-              <p>Official Portal: Bathuary Gram Panchayat, Egra-II Development Block</p>
+              <div className="leading-tight mt-0.5 font-bold text-slate-700">
+                <p>Bathuary Gram Panchayat</p>
+                <p>Egra-II Development Block</p>
+              </div>
             </div>
             <div className="text-center">
               <div className="w-44 border-t-2 border-dashed border-slate-900 pt-1 font-bold">
                 Authorized Signature
               </div>
-              <p className="text-[10px] text-slate-500">Bathuary Gram Panchayat</p>
+              <div className="text-[10px] text-slate-600 leading-tight mt-0.5">
+                <p>Bathuary Gram Panchayat</p>
+                <p>Egra-II Development Block</p>
+              </div>
             </div>
           </div>
         </div>

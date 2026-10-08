@@ -33,9 +33,26 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
   const language = 'en';
 
-  // Authentication State (Official login: BATHUARY_002 / Bathuary@2580)
+  // Inactivity timeout: 15 minutes (900,000 ms)
+  const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000;
+
+  // Authentication State: Session-based (cleared when browser/tab is closed or inactive)
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return safeStorage.getItem('bathuary_auth_logged_in') === 'true';
+    if (typeof window === 'undefined') return false;
+    const isSessionActive = window.sessionStorage?.getItem('bathuary_session_active') === 'true';
+    if (!isSessionActive) {
+      return false;
+    }
+    const lastActiveStr = window.sessionStorage?.getItem('bathuary_last_active');
+    if (lastActiveStr) {
+      const elapsed = Date.now() - Number(lastActiveStr);
+      if (elapsed > 15 * 60 * 1000) {
+        window.sessionStorage.removeItem('bathuary_session_active');
+        window.sessionStorage.setItem('bathuary_logout_reason', 'inactivity');
+        return false;
+      }
+    }
+    return true;
   });
 
   // Default active staff officer session
@@ -61,17 +78,78 @@ export default function App() {
 
   const handleLoginSuccess = (user: AppUser) => {
     setCurrentUser(user);
+    if (typeof window !== 'undefined') {
+      window.sessionStorage?.setItem('bathuary_session_active', 'true');
+      window.sessionStorage?.setItem('bathuary_last_active', String(Date.now()));
+      window.sessionStorage?.removeItem('bathuary_logout_reason');
+    }
     setIsAuthenticated(true);
     // AI Smart Auto-Sync: Automatically trigger live synchronization from Google Sheet upon login
     fetchAllData(true);
   };
 
-  const handleLogout = () => {
+  const handleLogout = (reason?: string) => {
+    if (typeof window !== 'undefined') {
+      window.sessionStorage?.removeItem('bathuary_session_active');
+      window.sessionStorage?.removeItem('bathuary_last_active');
+      if (reason) {
+        window.sessionStorage?.setItem('bathuary_logout_reason', reason);
+      } else {
+        window.sessionStorage?.removeItem('bathuary_logout_reason');
+      }
+    }
     safeStorage.removeItem('bathuary_auth_logged_in');
     safeStorage.removeItem('bathuary_auth_token');
     safeStorage.removeItem('bathuary_auth_user');
     setIsAuthenticated(false);
   };
+
+  // User Inactivity Tracker & Auto-Logout (15 minutes idle time)
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const checkInactivity = () => {
+      if (typeof window !== 'undefined') {
+        const lastActiveStr = window.sessionStorage?.getItem('bathuary_last_active');
+        if (lastActiveStr) {
+          const elapsed = Date.now() - Number(lastActiveStr);
+          if (elapsed > INACTIVITY_TIMEOUT_MS) {
+            handleLogout('inactivity');
+            return true;
+          }
+        }
+      }
+      return false;
+    };
+
+    const updateActivity = () => {
+      if (typeof window !== 'undefined') {
+        window.sessionStorage?.setItem('bathuary_last_active', String(Date.now()));
+      }
+    };
+
+    const handleVisibilityOrFocus = () => {
+      if (!checkInactivity()) {
+        updateActivity();
+      }
+    };
+
+    const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
+    events.forEach(e => window.addEventListener(e, updateActivity, { passive: true }));
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+
+    const checkInterval = setInterval(() => {
+      checkInactivity();
+    }, 10000);
+
+    return () => {
+      events.forEach(e => window.removeEventListener(e, updateActivity));
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      clearInterval(checkInterval);
+    };
+  }, [isAuthenticated]);
 
   // Data Store
   const [beneficiaries, setBeneficiaries] = useState<BeneficiaryRow[]>(INITIAL_BENEFICIARIES);
@@ -130,10 +208,10 @@ export default function App() {
         const timeStr = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
         setLastSyncTimeString(timeStr);
 
-        if (syncResult.isNewData && forceLiveSync) {
+        if (forceLiveSync) {
           setAutoSyncAlert({
             visible: true,
-            message: `✓ গুগল স্প্রেডশীট লাইভ ডাটা সফলভাবে সিঙ্ক হয়েছে (${syncResult.total.toLocaleString()} জন নাগরিকের ডাটা সক্রিয়)`
+            message: `✓ গুগল স্প্রেডশীট লাইভ ডাটা স্বয়ংক্রিয়ভাবে সিঙ্ক হয়েছে (${syncResult.total.toLocaleString()} জন নাগরিকের ডাটা সক্রিয়)`
           });
           setTimeout(() => setAutoSyncAlert(null), 4000);
         }
@@ -212,7 +290,7 @@ export default function App() {
       } catch {
         // silent background check
       }
-    }, 15000);
+    }, 10000);
 
     return () => {
       isMounted = false;
@@ -395,7 +473,16 @@ export default function App() {
       console.error("Save error:", err);
     }
     setBeneficiaries(prev => {
-      const updated = prev.map(b => b.rowIndex === formData.rowIndex ? { ...b, ...formData } : b);
+      const updated = prev.map(b => {
+        // If colY is updated, synchronize the Job Card Book Delivery status across all family members of the same Job Card
+        if (formData.colH && b.colH === formData.colH && formData.colY !== undefined) {
+          if (b.rowIndex === formData.rowIndex) {
+            return { ...b, ...formData };
+          }
+          return { ...b, colY: formData.colY, colW: formData.colW ?? b.colW };
+        }
+        return b.rowIndex === formData.rowIndex ? { ...b, ...formData } : b;
+      });
       saveCachedBeneficiaries(updated);
       return updated;
     });
@@ -479,7 +566,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-800 flex selection:bg-emerald-600 selection:text-white font-sans antialiased">
+    <div className="min-h-screen bg-gradient-to-br from-[#FFF9F2] via-[#FFF5EA] to-[#FEF0DE] text-slate-800 flex selection:bg-orange-500 selection:text-white font-sans antialiased">
       {/* 
         LEFT-ALIGNED SIDEBAR NAVIGATION 
         Dashboard, Citizen Search, Data Update Form, Village Report, AI Helpdesk, Deployment Guide, Policy & Security
@@ -639,12 +726,12 @@ export default function App() {
         </main>
 
         {/* Official Footer without Helpline Number */}
-        <footer className="bg-white border-t border-slate-200 py-6 px-4 sm:px-6 lg:px-8 text-xs text-slate-500 no-print mt-auto">
+        <footer className="bg-[#FFFDF9]/95 border-t border-amber-200/80 py-6 px-4 sm:px-6 lg:px-8 text-xs text-slate-600 no-print mt-auto shadow-xs">
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2 p-1 bg-white rounded-lg border border-slate-200 shadow-2xs">
+              <div className="flex items-center gap-2 p-1 bg-white rounded-lg border border-amber-200/80 shadow-2xs">
                 <NationalEmblemLogo className="w-5 h-7 text-slate-900" />
-                <div className="w-[1px] h-6 bg-slate-200" />
+                <div className="w-[1px] h-6 bg-amber-200" />
                 <VbGramGActLogo className="w-12 h-6" />
               </div>
               <div>

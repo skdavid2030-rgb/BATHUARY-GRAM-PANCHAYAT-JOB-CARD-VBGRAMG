@@ -419,9 +419,16 @@ export const JobCardA5PrintModal: React.FC<JobCardA5PrintModalProps> = ({
 
           {/* Under Table - Official Certification Note */}
           <div className="p-1.5 bg-slate-50 border border-slate-200 rounded text-[9px] text-slate-600 leading-tight mb-2">
-            <strong>Declaration & Note:</strong> This document certifies that the aforementioned Job Card and Family Members
-            are officially registered under Bathuary Gram Panchayat, Egra-II Development Block. The biometric e-KYC verification and ABPS
-            statuses are verified through official records.
+            <div>
+              <strong>Declaration & Note:</strong> This document certifies that the aforementioned Job Card and Family Members are officially registered under:
+            </div>
+            <div className="font-bold text-slate-900 my-0.5 leading-tight">
+              <div>Bathuary Gram Panchayat</div>
+              <div>Egra-II Development Block</div>
+            </div>
+            <div>
+              The biometric e-KYC verification and ABPS statuses are verified through official records.
+            </div>
           </div>
 
           {/* Bottom Authority Signature & Verification Details */}
@@ -433,31 +440,35 @@ export const JobCardA5PrintModal: React.FC<JobCardA5PrintModalProps> = ({
                 {qrCodeDataUrl && (
                   <div className="mb-1">
                     <img 
-                      src={qrCodeDataUrl} 
-                      alt="Verification QR" 
-                      className="w-11 h-11 object-contain border border-slate-300 rounded p-0.5 bg-white shadow-2xs"
-                    />
-                  </div>
-                )}
-                <p className="text-[11px] font-black text-slate-950">
-                  Issue Date: <span className="font-mono font-bold text-slate-900">{new Date().toLocaleDateString('en-GB')}</span>
-                </p>
-                <p className="text-[10px] font-bold text-slate-700">Office: Bathuary Gram Panchayat, Egra-II Development Block</p>
-                <p className="text-[9px] text-slate-500 font-mono">Ref: WB/EGR2/BAT/{row.colA || '001'}</p>
-              </div>
-
-              {/* Right: Only Authority Signature without Executive Authority text */}
-              <div className="text-center min-w-[180px]">
-                <div className="border-b-2 border-slate-900 pb-0.5 mb-1 font-serif italic text-[11px] text-slate-800 tracking-wider">
-                  Official Signature & Seal
+                    src={qrCodeDataUrl} 
+                    alt="Verification QR" 
+                    className="w-11 h-11 object-contain border border-slate-300 rounded p-0.5 bg-white shadow-2xs"
+                  />
                 </div>
-                <p className="font-black text-[11px] uppercase tracking-wide text-slate-950">
-                  Authority Signature
-                </p>
-                <p className="text-[10px] font-bold text-slate-700">
-                  Bathuary Gram Panchayat, Egra-II Development Block
-                </p>
+              )}
+              <p className="text-[11px] font-black text-slate-950">
+                Issue Date: <span className="font-mono font-bold text-slate-900">{new Date().toLocaleDateString('en-GB')}</span>
+              </p>
+              <div className="text-[10px] font-bold text-slate-700 leading-tight">
+                <p>Office: Bathuary Gram Panchayat</p>
+                <p>Egra-II Development Block</p>
               </div>
+              <p className="text-[9px] text-slate-500 font-mono">Ref: WB/EGR2/BAT/{row.colA || '001'}</p>
+            </div>
+
+            {/* Right: Only Authority Signature without Executive Authority text */}
+            <div className="text-center min-w-[180px]">
+              <div className="border-b-2 border-slate-900 pb-0.5 mb-1 font-serif italic text-[11px] text-slate-800 tracking-wider">
+                Official Signature & Seal
+              </div>
+              <p className="font-black text-[11px] uppercase tracking-wide text-slate-950">
+                Authority Signature
+              </p>
+              <div className="text-[10px] font-bold text-slate-700 leading-tight mt-0.5">
+                <p>Bathuary Gram Panchayat</p>
+                <p>Egra-II Development Block</p>
+              </div>
+            </div>
 
             </div>
           </div>

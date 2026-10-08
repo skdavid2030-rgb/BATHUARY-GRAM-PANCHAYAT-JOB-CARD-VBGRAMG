@@ -110,8 +110,8 @@ export const PolicyAndSecurity: React.FC<PolicyAndSecurityProps> = () => {
       </div>
 
       {/* Official Office Contact Box */}
-      <div className="rounded-3xl bg-white border-2 border-slate-200/80 p-6 sm:p-8 shadow-sm">
-        <div className="flex items-center gap-3 mb-5 border-b border-slate-100 pb-3">
+      <div className="rounded-3xl bg-[#FFFDFB] border-2 border-amber-200/90 p-6 sm:p-8 shadow-sm">
+        <div className="flex items-center gap-3 mb-5 border-b border-amber-100 pb-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-600 text-white flex items-center justify-center shadow-md shadow-emerald-600/20">
             <Building className="w-5 h-5" />
           </div>

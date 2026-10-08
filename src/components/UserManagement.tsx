@@ -106,7 +106,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({
     <div className="space-y-6">
       {/* Top Gradient Header */}
       <div className="rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 sm:p-8 shadow-xl border border-indigo-900/50 relative overflow-hidden">
-        <div className="h-1.5 w-full bg-gradient-to-r from-emerald-400 via-teal-300 to-indigo-400 absolute top-0 left-0" />
+        <div className="h-2 w-full bg-gradient-to-r from-orange-500 via-amber-400 via-emerald-400 to-teal-400 absolute top-0 left-0" />
         
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 relative z-10">
           <div className="flex items-center gap-4">
@@ -165,7 +165,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({
         {users.map(u => (
           <div
             key={u.mobile}
-            className="p-6 rounded-3xl bg-gradient-to-br from-white via-slate-50 to-emerald-50/20 border-2 border-slate-200/80 hover:border-emerald-500 shadow-sm hover:shadow-xl relative group transition-all duration-300 overflow-hidden"
+            className="p-6 rounded-3xl bg-[#FFFDFB] border-2 border-amber-200/90 hover:border-amber-400 shadow-sm hover:shadow-xl relative group transition-all duration-300 overflow-hidden"
           >
             <div className="h-1.5 w-full bg-gradient-to-r from-emerald-500 to-teal-500 absolute top-0 left-0" />
             

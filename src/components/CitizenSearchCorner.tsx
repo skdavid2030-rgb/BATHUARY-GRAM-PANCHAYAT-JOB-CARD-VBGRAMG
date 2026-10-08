@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Search, IdCard, CheckCircle2, Clock, Printer, FileCheck, MapPin, Building, CreditCard, User, X, Sparkles, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { BeneficiaryRow } from '../types';
 import { formatKycDate } from '../utils/dateFormatter';
+import { normalizeJobCardBookDelivered } from '../utils/jobCardDeliveryNormalizer';
 
 interface CitizenSearchCornerProps {
   beneficiaries: BeneficiaryRow[];
@@ -44,10 +45,10 @@ export const CitizenSearchCorner: React.FC<CitizenSearchCornerProps> = ({
   return (
     <div className="space-y-6">
       {/* Search Hero Box with Vibrant Gradient Accents */}
-      <div className="relative rounded-3xl bg-gradient-to-br from-white via-blue-50/20 to-emerald-50/20 border-2 border-slate-200 p-6 sm:p-8 shadow-sm text-center overflow-hidden">
+      <div className="relative rounded-3xl bg-gradient-to-br from-[#FFFDFB] via-[#FFF8EE] to-[#FFF1DF] border-2 border-amber-200/90 p-6 sm:p-8 shadow-sm text-center overflow-hidden">
         {/* Decorative background blurs */}
-        <div className="absolute -top-12 -left-12 w-48 h-48 bg-blue-400/10 rounded-full blur-2xl pointer-events-none" />
-        <div className="absolute -bottom-12 -right-12 w-48 h-48 bg-emerald-400/10 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute -top-12 -left-12 w-48 h-48 bg-orange-400/10 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute -bottom-12 -right-12 w-48 h-48 bg-amber-400/10 rounded-full blur-2xl pointer-events-none" />
 
         <div className="relative z-10 max-w-2xl mx-auto space-y-3">
           <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-gradient-to-r from-blue-500/15 to-emerald-500/15 border border-blue-300/60 text-blue-800 text-xs font-black shadow-2xs">
@@ -135,7 +136,7 @@ export const CitizenSearchCorner: React.FC<CitizenSearchCornerProps> = ({
                 return (
                   <div
                     key={`${row.colH}-${row.colJ}-${idx}`}
-                    className={`rounded-2xl bg-white border-2 ${
+                    className={`rounded-2xl bg-[#FFFDFB] border-2 ${
                       isDone 
                         ? 'border-emerald-200 hover:border-emerald-500' 
                         : isDead 
@@ -207,8 +208,8 @@ export const CitizenSearchCorner: React.FC<CitizenSearchCornerProps> = ({
                       </div>
                       <div>
                         <span className="text-[10px] font-bold text-slate-400 block">Book Delivered (Col Y):</span>
-                        <span className={`font-black truncate block ${row.colY === 'Yes' || row.colY === 'Y' || row.colY === 'হ্যাঁ' ? 'text-emerald-700' : 'text-slate-600'}`}>
-                          {row.colY === 'Yes' || row.colY === 'Y' || row.colY === 'হ্যাঁ' ? 'Yes' : 'No'}
+                        <span className={`font-black truncate block ${normalizeJobCardBookDelivered(row.colY) === 'Yes' ? 'text-emerald-700' : 'text-slate-600'}`}>
+                          {normalizeJobCardBookDelivered(row.colY) === 'Yes' ? 'Yes' : 'No'}
                         </span>
                       </div>
                       <div>
@@ -218,6 +219,18 @@ export const CitizenSearchCorner: React.FC<CitizenSearchCornerProps> = ({
                         </span>
                       </div>
                       <div>
+                        <span className="text-[10px] font-bold text-slate-400 block">Bank Name (Col AO):</span>
+                        <span className="font-bold text-slate-800 truncate block text-xs">
+                          {row.colAO ? `${row.colAO} (${row.colAP || '—'})` : <span className="text-slate-400 font-sans font-normal text-[11px]">শীটে নেই (Blank)</span>}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 block">Account Number (Col AR):</span>
+                        <span className="font-mono font-bold text-slate-800 tracking-wide truncate block text-xs">
+                          {row.colAR ? row.colAR : <span className="text-slate-400 font-sans font-normal text-[11px]">শীটে নেই (Blank)</span>}
+                        </span>
+                      </div>
+                      <div className="col-span-2">
                         <span className="text-[10px] font-bold text-slate-400 block">
                           {showFullAadhaar ? "Aadhaar Number (12 Digits):" : "Aadhaar (Masked):"}
                         </span>

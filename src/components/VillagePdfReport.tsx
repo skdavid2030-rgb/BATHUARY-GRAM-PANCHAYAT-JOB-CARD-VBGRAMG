@@ -70,6 +70,17 @@ export const VillagePdfReport: React.FC<VillagePdfReportProps> = ({
   const filteredRows = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
 
+    // Pre-calculate set of delivered Job Card numbers
+    const deliveredJcSet = new Set<string>();
+    if (selectedCategory === 'BOOK_DELIVERED') {
+      beneficiaries.forEach(b => {
+        const jc = (b.colH || '').trim();
+        if (jc && normalizeJobCardBookDelivered(b.colY) === 'Yes') {
+          deliveredJcSet.add(jc);
+        }
+      });
+    }
+
     let rows = beneficiaries.filter(row => {
       // Village filter
       if (selectedVillage && row.colV !== selectedVillage) {
@@ -94,8 +105,8 @@ export const VillagePdfReport: React.FC<VillagePdfReportProps> = ({
           return false;
         }
       } else if (selectedCategory === 'BOOK_DELIVERED') {
-        const isDeliv = normalizeJobCardBookDelivered(row.colY) === 'Yes';
-        if (!isDeliv) return false;
+        const jc = (row.colH || '').trim();
+        if (!jc || !deliveredJcSet.has(jc)) return false;
       }
 
       // Text search inside filtered view
@@ -219,8 +230,8 @@ export const VillagePdfReport: React.FC<VillagePdfReportProps> = ({
   return (
     <div className="space-y-6">
       {/* Top Filter & Control Card (Hidden when printing) */}
-      <div className="rounded-3xl bg-gradient-to-br from-white via-slate-50 to-indigo-50/20 border-2 border-slate-200 p-6 sm:p-7 shadow-sm no-print relative overflow-hidden">
-        <div className="h-1.5 w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500 absolute top-0 left-0" />
+      <div className="rounded-3xl bg-gradient-to-br from-[#FFFDFB] via-[#FFF8EE] to-[#FFF1DF] border-2 border-amber-200/90 p-6 sm:p-7 shadow-sm no-print relative overflow-hidden">
+        <div className="h-2 w-full bg-gradient-to-r from-orange-500 via-amber-400 via-emerald-400 to-teal-400 absolute top-0 left-0" />
         
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/80 pb-4 mb-5">
           <div className="flex items-center gap-3.5">
