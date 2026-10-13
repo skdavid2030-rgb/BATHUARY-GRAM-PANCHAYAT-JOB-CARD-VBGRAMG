@@ -664,7 +664,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
                 {/* Compliance checklist pills */}
                 <div className="grid grid-cols-2 gap-2">
                   {auditResult.complianceItems?.map((item, idx) => (
-                    <div key={idx} className="p-2.5 rounded-xl bg-white border border-slate-200 text-xs flex items-center justify-between shadow-2xs">
+                    <div key={`compliance-${item.label || idx}-${idx}`} className="p-2.5 rounded-xl bg-white border border-slate-200 text-xs flex items-center justify-between shadow-2xs">
                       <div>
                         <span className="text-[10px] text-slate-400 font-bold uppercase block">{item.label}</span>
                         <span className="text-xs font-bold text-slate-800 truncate block max-w-[130px]">{item.detail}</span>
@@ -690,7 +690,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
                     </div>
                     <ul className="list-disc pl-5 space-y-1 text-xs font-medium">
                       {auditResult.issues.map((iss: string, idx: number) => (
-                        <li key={idx}>{iss}</li>
+                        <li key={`ai-iss-${idx}`}>{iss}</li>
                       ))}
                     </ul>
                   </div>
@@ -704,7 +704,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
                     </div>
                     <ul className="list-disc pl-5 space-y-1 text-xs font-medium">
                       {auditResult.recommendations.map((rec: string, idx: number) => (
-                        <li key={idx}>{rec}</li>
+                        <li key={`ai-rec-${idx}`}>{rec}</li>
                       ))}
                     </ul>
                   </div>
@@ -752,7 +752,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
           <div className="flex flex-wrap gap-1.5 mb-3.5">
             {sampleQuestions.map((sq, i) => (
               <button
-                key={i}
+                key={`sample-q-${i}`}
                 onClick={() => handleSendQuestion(sq)}
                 className="text-[11px] bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-800 px-3 py-1.5 rounded-full border border-slate-200 hover:border-indigo-300 transition-all font-semibold cursor-pointer shadow-2xs hover:shadow-xs active:scale-95"
               >
@@ -765,7 +765,7 @@ export const AiAssistant: React.FC<AiAssistantProps> = ({
           <div className="flex-1 overflow-y-auto space-y-3.5 pr-1.5 text-xs">
             {messages.map((m, idx) => (
               <div
-                key={idx}
+                key={`msg-${m.sender}-${m.time || idx}-${idx}`}
                 className={`flex gap-2.5 ${m.sender === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 {m.sender === 'ai' && (

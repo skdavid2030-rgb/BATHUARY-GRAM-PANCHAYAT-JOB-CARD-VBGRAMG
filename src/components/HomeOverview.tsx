@@ -543,7 +543,7 @@ export const HomeOverview: React.FC<HomeOverviewProps> = ({
         <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2.5">
           {SANSAD_LIST.map((sansad, idx) => (
             <button
-              key={sansad}
+              key={`sansad-btn-${sansad}-${idx}`}
               type="button"
               onClick={() => onNavigateTab('reports', { sansad })}
               className="group px-3 py-2.5 rounded-xl bg-[#330C01] hover:bg-gradient-to-br hover:from-[#EA580C] hover:to-[#9A3412] text-amber-100 hover:text-white border-2 border-amber-700/70 hover:border-amber-300 text-xs font-black text-center transition-all duration-150 cursor-pointer shadow-sm hover:shadow-lg hover:-translate-y-0.5 flex flex-col items-center justify-center gap-1"

@@ -111,9 +111,9 @@ export const CitizenSearchCorner: React.FC<CitizenSearchCornerProps> = ({
           {/* Quick Filter Tags */}
           <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
             <span className="text-[11px] font-bold text-slate-400">Quick Filters:</span>
-            {quickFilterChips.map(chip => (
+            {quickFilterChips.map((chip, idx) => (
               <button
-                key={chip.label}
+                key={`qchip-${chip.label}-${idx}`}
                 onClick={() => setSearchTerm(chip.query)}
                 className="px-2.5 py-1 rounded-lg bg-white hover:bg-blue-600 hover:text-white border border-slate-200 text-slate-700 text-xs font-bold transition-all shadow-2xs hover:shadow-xs cursor-pointer hover:-translate-y-0.5"
               >

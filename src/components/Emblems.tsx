@@ -141,7 +141,7 @@ export const VbGramGActLogo: React.FC<EmblemProps> = ({ className = "w-28 h-16",
           const angle = (i * 360) / 24;
           return (
             <line
-              key={i}
+              key={`emblem-spoke-${i}`}
               x1="0"
               y1="0"
               x2="0"
@@ -166,7 +166,7 @@ export const VbGramGActLogo: React.FC<EmblemProps> = ({ className = "w-28 h-16",
           const y2 = 52 - Math.cos(rad) * 26;
           return (
             <line
-              key={i}
+              key={`emblem-sunray-${i}`}
               x1={x1}
               y1={y1}
               x2={x2}
@@ -369,7 +369,7 @@ export const BathuaryGramPanchayatOfficialLogo: React.FC<EmblemProps> = ({ class
         const cy = 100 + 95 * Math.sin(rad);
         return (
           <circle 
-            key={i} 
+            key={`seal-dot-${i}`} 
             cx={cx.toFixed(1)} 
             cy={cy.toFixed(1)} 
             r="1.7" 
@@ -426,7 +426,7 @@ export const BathuaryGramPanchayatOfficialLogo: React.FC<EmblemProps> = ({ class
         const angle = (i * 360) / 16;
         return (
           <line
-            key={i}
+            key={`seal-sunbeam-${i}`}
             x1="100"
             y1="93"
             x2="100"
@@ -474,7 +474,7 @@ export const BathuaryGramPanchayatOfficialLogo: React.FC<EmblemProps> = ({ class
           const angle = (i * 360) / 24;
           return (
             <line
-              key={i}
+              key={`ashoka-chakra-spoke-${i}`}
               x1="100"
               y1="93"
               x2="100"

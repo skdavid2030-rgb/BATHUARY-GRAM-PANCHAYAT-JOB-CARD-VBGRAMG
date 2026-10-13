@@ -162,9 +162,9 @@ export const UserManagement: React.FC<UserManagementProps> = ({
 
       {/* Users Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {users.map(u => (
+        {users.map((u, idx) => (
           <div
-            key={u.mobile}
+            key={`user-${u.userId || u.mobile || ''}-${idx}`}
             className="p-6 rounded-3xl bg-[#FFFDFB] border-2 border-amber-200/90 hover:border-amber-400 shadow-sm hover:shadow-xl relative group transition-all duration-300 overflow-hidden"
           >
             <div className="h-1.5 w-full bg-gradient-to-r from-emerald-500 to-teal-500 absolute top-0 left-0" />
@@ -274,7 +274,7 @@ export const UserManagement: React.FC<UserManagementProps> = ({
                 </tr>
               ) : (
                 filteredLogs.map((log, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
+                  <tr key={`audit-log-${log.id || log.timestamp || ''}-${idx}`} className="hover:bg-slate-50/80 transition-colors">
                     <td className="py-3 px-3.5 font-mono text-slate-500 font-bold">{log.timestamp}</td>
                     <td className="py-3 px-3.5 font-mono font-black text-indigo-700">
                       <span className="bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">

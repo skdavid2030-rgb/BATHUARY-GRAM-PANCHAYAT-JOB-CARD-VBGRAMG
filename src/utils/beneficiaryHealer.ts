@@ -68,7 +68,16 @@ export function extractCleanMobile(raw: any): string {
     return digits;
   }
 
-  // If 11 digits with repeated digit at end, or 9 digits, preserve digits for review
+  // 11-digit starting with [6-9] where 11th digit is trailing export artifact
+  if (digits.length === 11 && /^[6-9]/.test(digits)) {
+    return digits.slice(0, 10);
+  }
+
+  // 12-digit starting with [6-9] (non-91 prefix) where last 2 digits are export artifact
+  if (digits.length === 12 && /^[6-9]/.test(digits) && !digits.startsWith('91')) {
+    return digits.slice(0, 10);
+  }
+
   return digits;
 }
 
@@ -90,6 +99,10 @@ export function extractCleanAadhaar(raw: any): string {
   // 10 digits not matching mobile prefix: Excel dropped 2 leading zeros -> auto pad with 00
   else if (digits.length === 10 && !/^[6-9]/.test(digits)) {
     digits = '00' + digits;
+  }
+  // 13 digits starting with 0: Excel / formula added leading zero -> strip to 12 digits
+  else if (digits.length === 13 && digits.startsWith('0')) {
+    digits = digits.slice(1);
   }
 
   return digits;
@@ -150,7 +163,7 @@ export function healBeneficiaryRecord(b: BeneficiaryRow): BeneficiaryRow {
   // 3. Check for SWAPPED Aadhaar (colP) and Mobile (colQ)
   // If colP is a 10-digit number starting with 6,7,8,9 (an Indian mobile number):
   if (aadhaar.length === 10 && /^[6-9]/.test(aadhaar)) {
-    if (!mobile || mobile.length === 0) {
+    if (!mobile || mobile.length === 0 || mobile === aadhaar) {
       // Mobile was typed into Aadhaar field! Move to mobile and leave Aadhaar blank
       mobile = aadhaar;
       aadhaar = '';
@@ -159,6 +172,18 @@ export function healBeneficiaryRecord(b: BeneficiaryRow): BeneficiaryRow {
       const temp = mobile;
       mobile = aadhaar;
       aadhaar = temp;
+    } else {
+      // Mobile already has a phone, colP was duplicate phone
+      aadhaar = '';
+    }
+  }
+  // What if colQ has a 12-digit number (Aadhaar UID) and colP is empty?
+  else if ((!aadhaar || aadhaar.length === 0) && mobile.length === 12) {
+    if (mobile.startsWith('91') && /^[6-9]/.test(mobile.slice(2))) {
+      mobile = mobile.slice(2);
+    } else {
+      aadhaar = mobile;
+      mobile = '';
     }
   }
 

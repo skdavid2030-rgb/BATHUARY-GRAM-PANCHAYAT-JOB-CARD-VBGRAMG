@@ -6,6 +6,7 @@ import {
   FileCheck,
   CheckCircle2, 
   AlertCircle, 
+  AlertTriangle, 
   CreditCard, 
   User, 
   IdCard, 
@@ -23,6 +24,7 @@ import { VILLAGES_LIST, OFFICERS_LIST, canonicalizeBankName, LEGACY_IFSC_UPGRADE
 import { formatKycDate } from '../utils/dateFormatter';
 import { normalizeJobCardBookDelivered } from '../utils/jobCardDeliveryNormalizer';
 import { convertBengaliNumerals, extractCleanAadhaar, extractCleanMobile } from '../utils/beneficiaryHealer';
+import { validateAadhaarFormat, validateMobileFormat } from '../utils/validation';
 
 interface DataUpdateFormProps {
   beneficiaries: BeneficiaryRow[];
@@ -381,14 +383,39 @@ export const DataUpdateForm: React.FC<DataUpdateFormProps> = ({
   const handleAadhaarInputChange = (val: string) => {
     setAadhaarSearch(val);
     setIsAadhaarOpen(true);
-    const cleanDigits = val.replace(/\D/g, '');
+    const converted = convertBengaliNumerals(val);
+    const cleanDigits = converted.replace(/\D/g, '');
     setSelectedAadhaar(cleanDigits);
 
-    // Auto-populate immediately if user types or pastes all 12 digits of an existing Aadhaar
+    // 1. Auto-populate immediately if user types or pastes 12-digit Aadhaar
     if (cleanDigits.length === 12) {
-      const exactMatch = beneficiaries.find(b => (b.colP || '').replace(/\D/g, '') === cleanDigits);
+      const exactMatch = beneficiaries.find(b => {
+        const aadhaar = (b.colP || '').replace(/\D/g, '');
+        return aadhaar === cleanDigits || (aadhaar.length === 13 && aadhaar.startsWith(cleanDigits));
+      });
       if (exactMatch) {
         populateRecordToForm(exactMatch);
+        return;
+      }
+    }
+
+    // 2. Auto-populate immediately if user types or pastes 10-digit Indian mobile number
+    const mobileDigits = cleanDigits.length === 12 && cleanDigits.startsWith('91') && /^[6-9]/.test(cleanDigits.slice(2))
+      ? cleanDigits.slice(2)
+      : cleanDigits.length === 11 && cleanDigits.startsWith('0') && /^[6-9]/.test(cleanDigits.slice(1))
+        ? cleanDigits.slice(1)
+        : cleanDigits.length === 10 && /^[6-9]/.test(cleanDigits)
+          ? cleanDigits
+          : '';
+
+    if (mobileDigits) {
+      const exactPhoneMatch = beneficiaries.find(b => {
+        const phone = (b.colQ || '').replace(/\D/g, '');
+        return phone === mobileDigits || (phone.length === 11 && phone.startsWith(mobileDigits));
+      });
+      if (exactPhoneMatch) {
+        populateRecordToForm(exactPhoneMatch);
+        return;
       }
     }
   };
@@ -552,11 +579,12 @@ export const DataUpdateForm: React.FC<DataUpdateFormProps> = ({
     }));
   };
 
-  // Validations with graceful tolerance for clean numbers
-  const cleanP = extractCleanAadhaar(formData.colP);
-  const cleanQ = extractCleanMobile(formData.colQ);
-  const isAadhaarValid = formData.colP ? (cleanP.length >= 11 && cleanP.length <= 13) : true;
-  const isPhoneValid = formData.colQ ? (cleanQ.length === 10 || cleanQ.length === 11) : true;
+  // Real-time validations using helper functions
+  const aadhaarValidation = useMemo(() => validateAadhaarFormat(formData.colP), [formData.colP]);
+  const mobileValidation = useMemo(() => validateMobileFormat(formData.colQ), [formData.colQ]);
+
+  const isAadhaarValid = !formData.colP || aadhaarValidation.isValid;
+  const isPhoneValid = !formData.colQ || mobileValidation.isValid;
   const isAccountMatching = formData.colAR && formData.colAR_confirm 
     ? formData.colAR === formData.colAR_confirm 
     : true;
@@ -565,17 +593,17 @@ export const DataUpdateForm: React.FC<DataUpdateFormProps> = ({
     e.preventDefault();
     setSaveStatus(null);
 
-    if (!isAadhaarValid) {
+    if (formData.colP && !aadhaarValidation.isValid) {
       setSaveStatus({
         type: 'error',
-        message: "Please enter a valid 12-digit Aadhaar number."
+        message: aadhaarValidation.message || "Please enter a valid 12-digit Aadhaar number."
       });
       return;
     }
-    if (!isPhoneValid) {
+    if (formData.colQ && !mobileValidation.isValid) {
       setSaveStatus({
         type: 'error',
-        message: "Please enter a valid 10-digit mobile phone number."
+        message: mobileValidation.message || "Please enter a valid 10-digit mobile phone number."
       });
       return;
     }
@@ -957,8 +985,8 @@ export const DataUpdateForm: React.FC<DataUpdateFormProps> = ({
               <option value="">
                 {selectedJobCard ? "-- Select Applicant from Card --" : "-- First Search Job Card or Aadhaar --"}
               </option>
-              {availableApplicants.map(app => (
-                <option key={app} value={app}>{app}</option>
+              {availableApplicants.map((app, idx) => (
+                <option key={`app-${app}-${idx}`} value={app}>{app}</option>
               ))}
             </select>
           </div>
@@ -1081,57 +1109,194 @@ export const DataUpdateForm: React.FC<DataUpdateFormProps> = ({
               {/* Col P: Aadhaar */}
               <div>
                 <label className="text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
-                  <span>Aadhaar / ID Number (Col P):</span>
-                  <span className={`text-[10px] ${formData.colP.length === 12 ? 'text-emerald-600 font-bold' : 'text-slate-400'}`}>
-                    {formData.colP.length}/12
+                  <span className="flex items-center gap-1.5">
+                    <IdCard className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Aadhaar / ID Number (Col P):</span>
                   </span>
+                  <div className="flex items-center gap-1.5">
+                    {formData.colP && aadhaarValidation.isValid && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                        12/12 Valid
+                      </span>
+                    )}
+                    {formData.colP && !aadhaarValidation.isValid && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
+                        <AlertTriangle className="w-3 h-3 text-rose-600" />
+                        {aadhaarValidation.warning || 'Invalid'}
+                      </span>
+                    )}
+                    <span className={`text-[10px] font-mono ${
+                      formData.colP && !aadhaarValidation.isValid
+                        ? 'text-rose-600 font-bold'
+                        : aadhaarValidation.length === 12
+                          ? 'text-emerald-600 font-bold'
+                          : 'text-slate-400'
+                    }`}>
+                      {aadhaarValidation.length}/12
+                    </span>
+                  </div>
                 </label>
-                <input
-                  type="text"
-                  maxLength={14}
-                  placeholder="12 Digit Aadhaar Number"
-                  value={formData.colP}
-                  onChange={(e) => {
-                    const converted = convertBengaliNumerals(e.target.value);
-                    const clean = converted.replace(/\D/g, '').slice(0, 12);
-                    setFormData({ ...formData, colP: clean });
-                  }}
-                  className={`w-full bg-slate-50 text-slate-800 text-xs sm:text-sm font-semibold rounded-xl px-3.5 py-2.5 border focus:outline-none transition-all ${
-                    formData.colP && !isAadhaarValid 
-                      ? 'border-rose-400 bg-rose-50 text-rose-900' 
-                      : formData.colP.length >= 12 
-                        ? 'border-emerald-500 bg-emerald-50/50' 
-                        : 'border-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200'
-                  }`}
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    maxLength={16}
+                    placeholder="12 Digit Aadhaar (e.g. 1234 5678 9012)"
+                    value={formData.colP}
+                    onChange={(e) => {
+                      const converted = convertBengaliNumerals(e.target.value);
+                      setFormData({ ...formData, colP: converted });
+                    }}
+                    className={`w-full bg-slate-50 text-slate-800 text-xs sm:text-sm font-semibold rounded-xl px-3.5 py-2.5 pr-9 border focus:outline-none transition-all ${
+                      formData.colP && !aadhaarValidation.isValid 
+                        ? aadhaarValidation.hasInvalidChars || aadhaarValidation.errorType === 'TOO_LONG'
+                          ? 'border-rose-400 bg-rose-50/40 text-rose-950 focus:border-rose-500 focus:ring-2 focus:ring-rose-200'
+                          : 'border-amber-400 bg-amber-50/40 text-amber-950 focus:border-amber-500 focus:ring-2 focus:ring-amber-200'
+                        : formData.colP && aadhaarValidation.isValid
+                          ? 'border-emerald-500 bg-emerald-50/40 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200' 
+                          : 'border-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200'
+                    }`}
+                  />
+                  {formData.colP && !aadhaarValidation.isValid && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <AlertCircle className={`w-4 h-4 ${aadhaarValidation.hasInvalidChars || aadhaarValidation.errorType === 'TOO_LONG' ? 'text-rose-500' : 'text-amber-500'}`} />
+                    </div>
+                  )}
+                  {formData.colP && aadhaarValidation.isValid && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Visual Warning / Guidance Indicator */}
+                {formData.colP && !aadhaarValidation.isValid && (
+                  <div className={`mt-1.5 flex items-start justify-between gap-2 p-2 rounded-xl text-[11px] leading-tight border transition-all ${
+                    aadhaarValidation.hasInvalidChars || aadhaarValidation.errorType === 'TOO_LONG'
+                      ? 'bg-rose-50/90 border-rose-200 text-rose-800'
+                      : 'bg-amber-50/90 border-amber-200 text-amber-800'
+                  }`}>
+                    <div className="flex items-start gap-1.5">
+                      <AlertTriangle className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${
+                        aadhaarValidation.hasInvalidChars || aadhaarValidation.errorType === 'TOO_LONG' ? 'text-rose-600' : 'text-amber-600'
+                      }`} />
+                      <span className="font-semibold">{aadhaarValidation.message}</span>
+                    </div>
+                    {aadhaarValidation.hasInvalidChars && (
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, colP: aadhaarValidation.cleanValue.slice(0, 12) })}
+                        className="text-[10px] font-bold text-rose-700 bg-white hover:bg-rose-100 px-2 py-0.5 rounded border border-rose-300 shrink-0 transition-colors cursor-pointer"
+                        title="Remove invalid non-numeric characters"
+                      >
+                        Clean
+                      </button>
+                    )}
+                  </div>
+                )}
+                {formData.colP && aadhaarValidation.isValid && (
+                  <div className="mt-1.5 flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-bold bg-emerald-50 border border-emerald-200 text-emerald-800">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>{aadhaarValidation.message}</span>
+                  </div>
+                )}
               </div>
 
               {/* Col Q: Phone */}
               <div>
                 <label className="text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
-                  <span>Worker Phone Number (Col Q):</span>
-                  <span className={`text-[10px] ${formData.colQ.length === 10 ? 'text-emerald-600 font-bold' : 'text-slate-400'}`}>
-                    {formData.colQ.length}/10
+                  <span className="flex items-center gap-1.5">
+                    <Phone className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Worker Phone Number (Col Q):</span>
                   </span>
+                  <div className="flex items-center gap-1.5">
+                    {formData.colQ && mobileValidation.isValid && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                        10/10 Valid
+                      </span>
+                    )}
+                    {formData.colQ && !mobileValidation.isValid && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
+                        <AlertTriangle className="w-3 h-3 text-rose-600" />
+                        {mobileValidation.warning || 'Invalid'}
+                      </span>
+                    )}
+                    <span className={`text-[10px] font-mono ${
+                      formData.colQ && !mobileValidation.isValid
+                        ? 'text-rose-600 font-bold'
+                        : mobileValidation.length === 10
+                          ? 'text-emerald-600 font-bold'
+                          : 'text-slate-400'
+                    }`}>
+                      {mobileValidation.length}/10
+                    </span>
+                  </div>
                 </label>
-                <input
-                  type="text"
-                  maxLength={14}
-                  placeholder="10 Digit Mobile Number"
-                  value={formData.colQ}
-                  onChange={(e) => {
-                    const converted = convertBengaliNumerals(e.target.value);
-                    const clean = extractCleanMobile(converted) || converted.replace(/\D/g, '').slice(0, 10);
-                    setFormData({ ...formData, colQ: clean });
-                  }}
-                  className={`w-full bg-slate-50 text-slate-800 text-xs sm:text-sm font-semibold rounded-xl px-3.5 py-2.5 border focus:outline-none transition-all ${
-                    formData.colQ && !isPhoneValid 
-                      ? 'border-rose-400 bg-rose-50 text-rose-900' 
-                      : formData.colQ.length === 10 
-                        ? 'border-emerald-500 bg-emerald-50/50' 
-                        : 'border-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200'
-                  }`}
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    maxLength={16}
+                    placeholder="10 Digit Mobile (e.g. 9832123456)"
+                    value={formData.colQ}
+                    onChange={(e) => {
+                      const converted = convertBengaliNumerals(e.target.value);
+                      setFormData({ ...formData, colQ: converted });
+                    }}
+                    className={`w-full bg-slate-50 text-slate-800 text-xs sm:text-sm font-semibold rounded-xl px-3.5 py-2.5 pr-9 border focus:outline-none transition-all ${
+                      formData.colQ && !mobileValidation.isValid 
+                        ? mobileValidation.hasInvalidChars || mobileValidation.errorType === 'TOO_LONG' || mobileValidation.errorType === 'INVALID_PREFIX'
+                          ? 'border-rose-400 bg-rose-50/40 text-rose-950 focus:border-rose-500 focus:ring-2 focus:ring-rose-200'
+                          : 'border-amber-400 bg-amber-50/40 text-amber-950 focus:border-amber-500 focus:ring-2 focus:ring-amber-200'
+                        : formData.colQ && mobileValidation.isValid
+                          ? 'border-emerald-500 bg-emerald-50/40 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-200' 
+                          : 'border-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200'
+                    }`}
+                  />
+                  {formData.colQ && !mobileValidation.isValid && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <AlertCircle className={`w-4 h-4 ${mobileValidation.hasInvalidChars || mobileValidation.errorType === 'TOO_LONG' || mobileValidation.errorType === 'INVALID_PREFIX' ? 'text-rose-500' : 'text-amber-500'}`} />
+                    </div>
+                  )}
+                  {formData.colQ && mobileValidation.isValid && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Visual Warning / Guidance Indicator */}
+                {formData.colQ && !mobileValidation.isValid && (
+                  <div className={`mt-1.5 flex items-start justify-between gap-2 p-2 rounded-xl text-[11px] leading-tight border transition-all ${
+                    mobileValidation.hasInvalidChars || mobileValidation.errorType === 'TOO_LONG' || mobileValidation.errorType === 'INVALID_PREFIX'
+                      ? 'bg-rose-50/90 border-rose-200 text-rose-800'
+                      : 'bg-amber-50/90 border-amber-200 text-amber-800'
+                  }`}>
+                    <div className="flex items-start gap-1.5">
+                      <AlertTriangle className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${
+                        mobileValidation.hasInvalidChars || mobileValidation.errorType === 'TOO_LONG' || mobileValidation.errorType === 'INVALID_PREFIX'
+                          ? 'text-rose-600' : 'text-amber-600'
+                      }`} />
+                      <span className="font-semibold">{mobileValidation.message}</span>
+                    </div>
+                    {(mobileValidation.hasInvalidChars || mobileValidation.errorType === 'TOO_LONG') && (
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, colQ: mobileValidation.cleanValue.slice(0, 10) })}
+                        className="text-[10px] font-bold text-rose-700 bg-white hover:bg-rose-100 px-2 py-0.5 rounded border border-rose-300 shrink-0 transition-colors cursor-pointer"
+                        title="Auto-clean 10-digit mobile"
+                      >
+                        Clean
+                      </button>
+                    )}
+                  </div>
+                )}
+                {formData.colQ && mobileValidation.isValid && (
+                  <div className="mt-1.5 flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-bold bg-emerald-50 border border-emerald-200 text-emerald-800">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>{mobileValidation.message}</span>
+                  </div>
+                )}
               </div>
 
               {/* Col R: e-KYC Done */}
@@ -1198,8 +1363,8 @@ export const DataUpdateForm: React.FC<DataUpdateFormProps> = ({
                   className="w-full bg-slate-50 text-slate-800 text-xs sm:text-sm font-semibold rounded-xl px-3.5 py-2.5 border border-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 focus:outline-none transition-all cursor-pointer"
                 >
                   <option value="">-- Select Officer --</option>
-                  {OFFICERS_LIST.map(officer => (
-                    <option key={officer} value={officer}>{officer}</option>
+                  {OFFICERS_LIST.map((officer, idx) => (
+                    <option key={`officer-${officer}-${idx}`} value={officer}>{officer}</option>
                   ))}
                 </select>
               </div>
@@ -1216,8 +1381,8 @@ export const DataUpdateForm: React.FC<DataUpdateFormProps> = ({
                 >
                   <option value="">-- Select Village --</option>
                   <option value="No Village Name">No Village Name (Unassigned)</option>
-                  {VILLAGES_LIST.map(v => (
-                    <option key={v} value={v}>{v}</option>
+                  {VILLAGES_LIST.map((v, idx) => (
+                    <option key={`vlist-${v}-${idx}`} value={v}>{v}</option>
                   ))}
                 </select>
               </div>
@@ -1333,10 +1498,10 @@ export const DataUpdateForm: React.FC<DataUpdateFormProps> = ({
                   >
                     <option value="">-- Choose IFSC Code (Auto-fills Bank & Branch) --</option>
                     {formData.colAP && !bankMaster.some(b => b.ifsc.toUpperCase() === formData.colAP.toUpperCase()) && (
-                      <option value={formData.colAP}>{formData.colAP} — Current Record IFSC</option>
+                      <option key="current-record-ifsc" value={formData.colAP}>{formData.colAP} — Current Record IFSC</option>
                     )}
-                    {bankMaster.map(item => (
-                      <option key={`${item.bank}-${item.branch}-${item.ifsc}`} value={item.ifsc}>
+                    {bankMaster.map((item, idx) => (
+                      <option key={`bm-opt-${item.bank}-${item.branch}-${item.ifsc}-${idx}`} value={item.ifsc}>
                         {item.ifsc} — {item.bank} ({item.branch})
                       </option>
                     ))}
@@ -1368,8 +1533,8 @@ export const DataUpdateForm: React.FC<DataUpdateFormProps> = ({
                     className="w-full bg-slate-50 text-slate-800 text-xs sm:text-sm font-semibold rounded-xl px-3.5 py-2.5 border border-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 focus:outline-none transition-all cursor-pointer"
                   >
                     <option value="">-- Select Bank --</option>
-                    {uniqueBanks.map(b => (
-                      <option key={b} value={b}>{b}</option>
+                    {uniqueBanks.map((b, idx) => (
+                      <option key={`ub-${b}-${idx}`} value={b}>{b}</option>
                     ))}
                   </select>
                   <input
@@ -1400,8 +1565,8 @@ export const DataUpdateForm: React.FC<DataUpdateFormProps> = ({
                       className="w-full bg-slate-50 text-slate-800 text-xs sm:text-sm font-semibold rounded-xl px-3.5 py-2.5 border border-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 focus:outline-none transition-all cursor-pointer"
                     >
                       <option value="">-- Choose Branch ({availableBranches.length} verified) --</option>
-                      {availableBranches.map(b => (
-                        <option key={`${b.bank}-${b.branch}-${b.ifsc}`} value={b.branch}>
+                      {availableBranches.map((b, idx) => (
+                        <option key={`branch-opt-${b.bank}-${b.branch}-${b.ifsc}-${idx}`} value={b.branch}>
                           {b.branch} — (IFSC: {b.ifsc})
                         </option>
                       ))}
@@ -1566,8 +1731,8 @@ export const DataUpdateForm: React.FC<DataUpdateFormProps> = ({
                   </span>
                 </div>
                 <div className="space-y-1">
-                  {pendingChanges.map(c => (
-                    <div key={c.key} className="text-[11px] flex items-center justify-between gap-2 text-slate-700 border-b border-emerald-100/60 pb-1">
+                  {pendingChanges.map((c, idx) => (
+                    <div key={`pc-${c.key}-${idx}`} className="text-[11px] flex items-center justify-between gap-2 text-slate-700 border-b border-emerald-100/60 pb-1">
                       <span className="font-semibold text-slate-900 truncate">{c.label}:</span>
                       <span className="font-mono text-emerald-800 font-bold shrink-0">{c.value || '<Empty>'}</span>
                     </div>

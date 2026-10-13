@@ -432,6 +432,15 @@ function extractCleanMobile(raw: any): string {
   if (digits.length === 11 && digits.startsWith('0') && /^[6-9]/.test(digits.slice(1))) {
     return digits.slice(1);
   }
+  if (digits.length === 10) {
+    return digits;
+  }
+  if (digits.length === 11 && /^[6-9]/.test(digits)) {
+    return digits.slice(0, 10);
+  }
+  if (digits.length === 12 && /^[6-9]/.test(digits) && !digits.startsWith('91')) {
+    return digits.slice(0, 10);
+  }
   return digits;
 }
 
@@ -445,6 +454,8 @@ function extractCleanAadhaar(raw: any): string {
     digits = '0' + digits;
   } else if (digits.length === 10 && !/^[6-9]/.test(digits)) {
     digits = '00' + digits;
+  } else if (digits.length === 13 && digits.startsWith('0')) {
+    digits = digits.slice(1);
   }
   return digits;
 }
@@ -494,13 +505,22 @@ function healBeneficiaryRecord(b: BeneficiaryRow): BeneficiaryRow {
 
   // Swapped Aadhaar and Mobile check
   if (aadhaar.length === 10 && /^[6-9]/.test(aadhaar)) {
-    if (!mobile || mobile.length === 0) {
+    if (!mobile || mobile.length === 0 || mobile === aadhaar) {
       mobile = aadhaar;
       aadhaar = '';
     } else if (mobile.length === 12) {
       const temp = mobile;
       mobile = aadhaar;
       aadhaar = temp;
+    } else {
+      aadhaar = '';
+    }
+  } else if ((!aadhaar || aadhaar.length === 0) && mobile.length === 12) {
+    if (mobile.startsWith('91') && /^[6-9]/.test(mobile.slice(2))) {
+      mobile = mobile.slice(2);
+    } else {
+      aadhaar = mobile;
+      mobile = '';
     }
   }
 

@@ -358,7 +358,7 @@ export const JobCardA5PrintModal: React.FC<JobCardA5PrintModalProps> = ({
                     const isAbpsDone = (member.colO || '').toUpperCase() === 'YES' || (member.colO || '').toUpperCase() === 'Y';
 
                     return (
-                      <tr key={member.colI || idx} className={idx % 2 === 1 ? 'bg-slate-50/50' : 'bg-white'}>
+                      <tr key={`a5-member-${member.colH || ''}-${member.colJ || ''}-${idx}`} className={idx % 2 === 1 ? 'bg-slate-50/50' : 'bg-white'}>
                         {/* Applicant No (Col I) */}
                         <td className="py-1 px-2 border-r border-slate-300 text-center font-bold text-slate-900">
                           {member.colI || idx + 1}

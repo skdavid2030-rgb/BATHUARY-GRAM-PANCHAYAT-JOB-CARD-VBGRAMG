@@ -168,8 +168,8 @@ export const DashboardAnalytics: React.FC<DashboardProps> = ({
                 className="bg-[#300A01] text-amber-100 text-xs font-black rounded-lg px-2.5 py-1 border border-amber-600/60 focus:outline-none focus:ring-2 focus:ring-amber-400 transition-all cursor-pointer min-w-[170px] shadow-2xs"
               >
                 <option value="ALL">-- ALL 16 SANSADS --</option>
-                {sansadList.map(s => (
-                  <option key={s} value={s}>{s}</option>
+                {sansadList.map((s, idx) => (
+                  <option key={`sansad-opt-${s}-${idx}`} value={s}>{s}</option>
                 ))}
               </select>
             </div>
@@ -503,7 +503,7 @@ export const DashboardAnalytics: React.FC<DashboardProps> = ({
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 max-h-[550px] overflow-y-auto pr-1">
-          {filteredVillages.map(vs => {
+          {filteredVillages.map((vs, idx) => {
             const isNoVillage = vs.village === 'No Village Name';
             const vDonePct = vs.total ? Math.round((vs.done / vs.total) * 100) : 0;
             const isHigh = vDonePct >= 75;
@@ -511,7 +511,7 @@ export const DashboardAnalytics: React.FC<DashboardProps> = ({
 
             return (
               <div 
-                key={vs.village} 
+                key={`vstat-${vs.village}-${idx}`} 
                 className={`p-4 rounded-2xl border-2 transition-all duration-200 relative overflow-hidden group ${
                   isNoVillage 
                     ? 'bg-amber-50/50 border-amber-300 hover:border-amber-500 hover:shadow-lg' 

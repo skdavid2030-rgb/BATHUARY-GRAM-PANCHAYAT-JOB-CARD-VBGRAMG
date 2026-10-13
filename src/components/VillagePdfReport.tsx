@@ -303,8 +303,8 @@ export const VillagePdfReport: React.FC<VillagePdfReportProps> = ({
               className="w-full bg-slate-50 text-slate-900 text-xs sm:text-sm font-bold rounded-xl px-3 py-2 border-2 border-slate-200 focus:border-indigo-500 focus:bg-white focus:outline-none transition-all cursor-pointer"
             >
               <option value="">-- ALL SANSADS (1-16) --</option>
-              {SANSAD_LIST.map(s => (
-                <option key={s} value={s}>{s}</option>
+              {SANSAD_LIST.map((s, idx) => (
+                <option key={`vpr-s-${s}-${idx}`} value={s}>{s}</option>
               ))}
             </select>
           </div>
@@ -333,8 +333,8 @@ export const VillagePdfReport: React.FC<VillagePdfReportProps> = ({
             >
               <option value="">-- ALL 29 VILLAGES --</option>
               <option value="No Village Name">⚠️ No Village Name (Unassigned)</option>
-              {VILLAGES_LIST.map(v => (
-                <option key={v} value={v}>{v}</option>
+              {VILLAGES_LIST.map((v, idx) => (
+                <option key={`vpr-v-${v}-${idx}`} value={v}>{v}</option>
               ))}
             </select>
           </div>
