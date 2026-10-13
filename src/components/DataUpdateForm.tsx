@@ -22,6 +22,7 @@ import { BeneficiaryRow, BankMasterItem, AppUser } from '../types';
 import { VILLAGES_LIST, OFFICERS_LIST, canonicalizeBankName, LEGACY_IFSC_UPGRADE_MAP } from '../data/bankMaster';
 import { formatKycDate } from '../utils/dateFormatter';
 import { normalizeJobCardBookDelivered } from '../utils/jobCardDeliveryNormalizer';
+import { convertBengaliNumerals, extractCleanAadhaar, extractCleanMobile } from '../utils/beneficiaryHealer';
 
 interface DataUpdateFormProps {
   beneficiaries: BeneficiaryRow[];
@@ -140,10 +141,15 @@ export const DataUpdateForm: React.FC<DataUpdateFormProps> = ({
 
   // Live filtered suggestions for Aadhaar & Mobile Number Search
   const filteredAadhaarRecords = useMemo(() => {
-    const raw = aadhaarSearch.trim();
+    const raw = convertBengaliNumerals(aadhaarSearch).trim();
     if (!raw) return [];
     
     const digitsOnly = raw.replace(/\D/g, '');
+    const mobileDigits = digitsOnly.length === 12 && digitsOnly.startsWith('91') && /^[6-9]/.test(digitsOnly.slice(2))
+      ? digitsOnly.slice(2)
+      : digitsOnly.length === 11 && digitsOnly.startsWith('0') && /^[6-9]/.test(digitsOnly.slice(1))
+        ? digitsOnly.slice(1)
+        : digitsOnly;
     const lower = raw.toLowerCase();
 
     // Collect matching items with priority scoring
@@ -173,15 +179,16 @@ export const DataUpdateForm: React.FC<DataUpdateFormProps> = ({
       }
 
       // 2. Mobile Phone matching
-      if (digitsOnly.length > 0 && phoneClean.length > 0) {
-        if (phoneClean === digitsOnly) {
-          score = Math.max(score, 70); // Exact phone
-        } else if (phoneClean.startsWith(digitsOnly)) {
-          score = Math.max(score, 55);
-        } else if (phoneClean.endsWith(digitsOnly)) {
-          score = Math.max(score, 50);
-        } else if (phoneClean.includes(digitsOnly)) {
-          score = Math.max(score, 45);
+      const targetPhoneQuery = mobileDigits || digitsOnly;
+      if (targetPhoneQuery.length > 0 && phoneClean.length > 0) {
+        if (phoneClean === targetPhoneQuery) {
+          score = Math.max(score, 90); // Exact phone
+        } else if (phoneClean.startsWith(targetPhoneQuery)) {
+          score = Math.max(score, 75);
+        } else if (phoneClean.endsWith(targetPhoneQuery)) {
+          score = Math.max(score, 70);
+        } else if (phoneClean.includes(targetPhoneQuery)) {
+          score = Math.max(score, 60);
         }
       }
 
@@ -545,9 +552,11 @@ export const DataUpdateForm: React.FC<DataUpdateFormProps> = ({
     }));
   };
 
-  // Validations
-  const isAadhaarValid = formData.colP ? /^\d{12}$/.test(formData.colP) : true;
-  const isPhoneValid = formData.colQ ? /^\d{10}$/.test(formData.colQ) : true;
+  // Validations with graceful tolerance for clean numbers
+  const cleanP = extractCleanAadhaar(formData.colP);
+  const cleanQ = extractCleanMobile(formData.colQ);
+  const isAadhaarValid = formData.colP ? (cleanP.length >= 11 && cleanP.length <= 13) : true;
+  const isPhoneValid = formData.colQ ? (cleanQ.length === 10 || cleanQ.length === 11) : true;
   const isAccountMatching = formData.colAR && formData.colAR_confirm 
     ? formData.colAR === formData.colAR_confirm 
     : true;
@@ -1079,14 +1088,18 @@ export const DataUpdateForm: React.FC<DataUpdateFormProps> = ({
                 </label>
                 <input
                   type="text"
-                  maxLength={12}
+                  maxLength={14}
                   placeholder="12 Digit Aadhaar Number"
                   value={formData.colP}
-                  onChange={(e) => setFormData({ ...formData, colP: e.target.value.replace(/\D/g, '') })}
+                  onChange={(e) => {
+                    const converted = convertBengaliNumerals(e.target.value);
+                    const clean = converted.replace(/\D/g, '').slice(0, 12);
+                    setFormData({ ...formData, colP: clean });
+                  }}
                   className={`w-full bg-slate-50 text-slate-800 text-xs sm:text-sm font-semibold rounded-xl px-3.5 py-2.5 border focus:outline-none transition-all ${
                     formData.colP && !isAadhaarValid 
                       ? 'border-rose-400 bg-rose-50 text-rose-900' 
-                      : formData.colP.length === 12 
+                      : formData.colP.length >= 12 
                         ? 'border-emerald-500 bg-emerald-50/50' 
                         : 'border-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200'
                   }`}
@@ -1103,10 +1116,14 @@ export const DataUpdateForm: React.FC<DataUpdateFormProps> = ({
                 </label>
                 <input
                   type="text"
-                  maxLength={10}
+                  maxLength={14}
                   placeholder="10 Digit Mobile Number"
                   value={formData.colQ}
-                  onChange={(e) => setFormData({ ...formData, colQ: e.target.value.replace(/\D/g, '') })}
+                  onChange={(e) => {
+                    const converted = convertBengaliNumerals(e.target.value);
+                    const clean = extractCleanMobile(converted) || converted.replace(/\D/g, '').slice(0, 10);
+                    setFormData({ ...formData, colQ: clean });
+                  }}
                   className={`w-full bg-slate-50 text-slate-800 text-xs sm:text-sm font-semibold rounded-xl px-3.5 py-2.5 border focus:outline-none transition-all ${
                     formData.colQ && !isPhoneValid 
                       ? 'border-rose-400 bg-rose-50 text-rose-900' 

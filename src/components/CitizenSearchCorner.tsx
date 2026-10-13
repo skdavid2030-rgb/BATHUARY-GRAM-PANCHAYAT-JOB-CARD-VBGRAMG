@@ -3,6 +3,7 @@ import { Search, IdCard, CheckCircle2, Clock, Printer, FileCheck, MapPin, Buildi
 import { BeneficiaryRow } from '../types';
 import { formatKycDate } from '../utils/dateFormatter';
 import { normalizeJobCardBookDelivered } from '../utils/jobCardDeliveryNormalizer';
+import { convertBengaliNumerals } from '../utils/beneficiaryHealer';
 
 interface CitizenSearchCornerProps {
   beneficiaries: BeneficiaryRow[];
@@ -21,20 +22,38 @@ export const CitizenSearchCorner: React.FC<CitizenSearchCornerProps> = ({
   const [showFullAadhaar, setShowFullAadhaar] = useState(true);
   const isBn = language === 'bn';
 
-  const trimmed = searchTerm.trim().toLowerCase();
+  const normalizedSearch = convertBengaliNumerals(searchTerm).trim();
+  const trimmed = normalizedSearch.toLowerCase();
   const digitsOnly = trimmed.replace(/\D/g, '');
+  // Extract clean mobile query (strip +91, 91, or leading 0 if present)
+  const mobileQuery = digitsOnly.length === 12 && digitsOnly.startsWith('91') && /^[6-9]/.test(digitsOnly.slice(2))
+    ? digitsOnly.slice(2)
+    : digitsOnly.length === 11 && digitsOnly.startsWith('0') && /^[6-9]/.test(digitsOnly.slice(1))
+      ? digitsOnly.slice(1)
+      : digitsOnly;
+
   const searchResults = trimmed
-    ? beneficiaries.filter(b => 
-        (b.colH && String(b.colH).toLowerCase().includes(trimmed)) ||
-        (b.colJ && String(b.colJ).toLowerCase().includes(trimmed)) ||
-        (b.colAF && String(b.colAF).toLowerCase().includes(trimmed)) ||
-        (b.colAG && String(b.colAG).toLowerCase().includes(trimmed)) ||
-        (b.colP && String(b.colP).toLowerCase().includes(trimmed)) ||
-        (digitsOnly.length >= 4 && b.colP && b.colP.replace(/\D/g, '').includes(digitsOnly)) ||
-        (b.colQ && String(b.colQ).toLowerCase().includes(trimmed)) ||
-        (digitsOnly.length >= 5 && b.colQ && b.colQ.replace(/\D/g, '').includes(digitsOnly)) ||
-        (b.colV && String(b.colV).toLowerCase().includes(trimmed))
-      ).slice(0, 30)
+    ? beneficiaries.filter(b => {
+        const aadhaarDigits = (b.colP || '').replace(/\D/g, '');
+        const phoneDigits = (b.colQ || '').replace(/\D/g, '');
+
+        if (b.colH && String(b.colH).toLowerCase().includes(trimmed)) return true;
+        if (b.colJ && String(b.colJ).toLowerCase().includes(trimmed)) return true;
+        if (b.colAF && String(b.colAF).toLowerCase().includes(trimmed)) return true;
+        if (b.colAG && String(b.colAG).toLowerCase().includes(trimmed)) return true;
+        if (b.colV && String(b.colV).toLowerCase().includes(trimmed)) return true;
+        if (b.colB && String(b.colB).toLowerCase().includes(trimmed)) return true;
+
+        // Aadhaar search (check exact/substring or last 4 digits)
+        if (digitsOnly.length >= 3 && aadhaarDigits.includes(digitsOnly)) return true;
+        if (b.colP && String(b.colP).toLowerCase().includes(trimmed)) return true;
+
+        // Mobile search (check 10-digit or substring)
+        if (mobileQuery.length >= 4 && phoneDigits.includes(mobileQuery)) return true;
+        if (b.colQ && String(b.colQ).toLowerCase().includes(trimmed)) return true;
+
+        return false;
+      }).slice(0, 40)
     : [];
 
   const quickFilterChips = [
@@ -235,15 +254,27 @@ export const CitizenSearchCorner: React.FC<CitizenSearchCornerProps> = ({
                           {row.colAR ? row.colAR : <span className="text-slate-400 font-sans font-normal text-[11px]">শীটে নেই (Blank)</span>}
                         </span>
                       </div>
-                      <div className="col-span-2">
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 block">Worker Mobile (Col Q):</span>
+                        <span className="font-mono font-bold text-slate-900 truncate block text-xs">
+                          {row.colQ ? (
+                            row.colQ.length === 10
+                              ? `${row.colQ.slice(0, 5)} ${row.colQ.slice(5)}`
+                              : row.colQ
+                          ) : (
+                            <span className="text-slate-400 font-sans font-normal text-[11px]">শীটে নেই (Not in Sheet)</span>
+                          )}
+                        </span>
+                      </div>
+                      <div>
                         <span className="text-[10px] font-bold text-slate-400 block">
-                          {showFullAadhaar ? "Aadhaar Number (12 Digits):" : "Aadhaar (Masked):"}
+                          {showFullAadhaar ? "Aadhaar Number (UID):" : "Aadhaar (Masked):"}
                         </span>
                         <span className="font-mono font-black text-slate-800 tracking-wide truncate block text-xs">
                           {row.colP ? (
                             showFullAadhaar ? (
-                              row.colP.length === 12
-                                ? `${row.colP.slice(0, 4)} ${row.colP.slice(4, 8)} ${row.colP.slice(8, 12)}`
+                              row.colP.length >= 12
+                                ? `${row.colP.slice(0, 4)} ${row.colP.slice(4, 8)} ${row.colP.slice(8)}`
                                 : row.colP
                             ) : (
                               `•••• •••• ${row.colP.slice(-4)}`

@@ -3,7 +3,7 @@ import { BeneficiaryRow, PERMANENT_BATHUARY_SHEET_URL, PERMANENT_APPS_SCRIPT_URL
 import { normalizeVillageName } from './villageNormalizer';
 import { normalizeSansadName, sortSansads, isHeaderOrJunkSansad } from './sansadNormalizer';
 import { normalizeJobCardBookDelivered, normalizeJobCardSubmitted } from './jobCardDeliveryNormalizer';
-import { healBeneficiaryRecord } from './beneficiaryHealer';
+import { healBeneficiaryRecord, extractCleanAadhaar, extractCleanMobile, cleanRawNumber, convertBengaliNumerals } from './beneficiaryHealer';
 import { formatKycDate } from './dateFormatter';
 import { safeStorage } from './safeStorage';
 import {
@@ -111,12 +111,16 @@ export function parseSheetRowsToBeneficiaries(rawData: any[][]): BeneficiaryRow[
           colMap['colH'] = colIdx;
         }
         // Priority 4: Col Q - Phone / Mobile
-        else if (val.includes('mobile') || val.includes('phone') || val.includes('contact') || val.includes('ফোন')) {
+        else if (
+          val.includes('mobile') || val.includes('phone') || val.includes('contact') ||
+          val.includes('ফোন') || val.includes('মোবাইল') || val.includes('mob') || val.includes('cell') ||
+          val === 'col q' || val === 'colq'
+        ) {
           colMap['colQ'] = colIdx;
         }
         // Priority 5: Col P - Aadhaar Number
         else if (
-          (val.includes('aadhaar') || val.includes('uid')) &&
+          (val.includes('aadhaar') || val.includes('aadhar') || val.includes('adhar') || val.includes('uid') || val.includes('আধার')) &&
           !val.includes('name') &&
           !val.includes('seeded') &&
           !val.includes('auth') &&
@@ -210,11 +214,34 @@ export function parseSheetRowsToBeneficiaries(rawData: any[][]): BeneficiaryRow[
     const rawAbps = get('colO', 14).toUpperCase();
     const isAbpsActive = rawAbps === 'YES' || rawAbps === 'Y' || rawAbps === 'ENABLED' || rawAbps === '1';
 
-    let aadhaarClean = get('colP', 15).replace(/\D/g, '');
-    if (aadhaarClean.length === 11) {
-      aadhaarClean = '0' + aadhaarClean;
+    let aadhaarClean = extractCleanAadhaar(get('colP', 15));
+    let mobileClean = extractCleanMobile(get('colQ', 16));
+
+    // AI Fallback Scanner: If Aadhaar is blank, scan row cells for a 12-digit number
+    if (!aadhaarClean) {
+      for (let c = 0; c < row.length; c++) {
+        if (c === colMap['colH'] || c === colMap['colJ']) continue;
+        const cVal = cleanRawNumber(row[c]);
+        const d = cVal.replace(/\D/g, '');
+        if (d.length === 12 && d !== jobCard.replace(/\D/g, '')) {
+          aadhaarClean = d;
+          break;
+        }
+      }
     }
-    const mobileClean = get('colQ', 16).replace(/\D/g, '');
+
+    // AI Fallback Scanner: If Mobile is blank, scan row cells for a 10-digit mobile number
+    if (!mobileClean) {
+      for (let c = 0; c < row.length; c++) {
+        if (c === colMap['colH'] || c === colMap['colJ']) continue;
+        const cVal = cleanRawNumber(row[c]);
+        const m = cVal.match(/\b([6-9]\d{9})\b/);
+        if (m) {
+          mobileClean = m[1];
+          break;
+        }
+      }
+    }
 
     const record: BeneficiaryRow = {
       rowIndex: parsed.length + 2,
@@ -346,8 +373,47 @@ async function fetchFromAppsScript(appsScriptUrl: string): Promise<BeneficiaryRo
     return json.data.map((item: any, idx: number) => {
       const rawSl = Number(item['Sheet Sl No'] || (idx + 1));
       const rawJc = String(item['Job Card Number'] || item['colH'] || '').trim();
-      const rawAadhaar = String(item['Aadhaar Number'] || item['colP'] || '').replace(/\D/g, '');
-      const rawPhone = String(item['Worker Phone Number (if available)'] || item['Worker Phone Number'] || item['colQ'] || '').replace(/\D/g, '');
+      // Dynamic intelligent resolution of Aadhaar from item keys
+      let rawAadhaar = '';
+      for (const k of Object.keys(item)) {
+        const kLow = k.toLowerCase();
+        if (
+          (kLow.includes('aadhaar') || kLow.includes('aadhar') || kLow.includes('adhar') || kLow.includes('uid') || kLow.includes('আধার')) &&
+          !kLow.includes('name') &&
+          !kLow.includes('seeded') &&
+          !kLow.includes('auth') &&
+          !kLow.includes('demographic')
+        ) {
+          const v = item[k];
+          if (v !== undefined && v !== null && String(v).trim()) {
+            rawAadhaar = extractCleanAadhaar(v);
+            break;
+          }
+        }
+      }
+      if (!rawAadhaar) {
+        rawAadhaar = extractCleanAadhaar(item['Aadhaar Number'] || item['Aadhaar / ID Number'] || item['colP'] || item['Col P'] || '');
+      }
+
+      // Dynamic intelligent resolution of Mobile from item keys
+      let rawPhone = '';
+      for (const k of Object.keys(item)) {
+        const kLow = k.toLowerCase();
+        if (
+          (kLow.includes('mobile') || kLow.includes('phone') || kLow.includes('contact') || kLow.includes('মোবাইল') || kLow.includes('ফোন') || kLow.includes('mob') || kLow.includes('cell')) &&
+          !kLow.includes('name') &&
+          !kLow.includes('card')
+        ) {
+          const v = item[k];
+          if (v !== undefined && v !== null && String(v).trim()) {
+            rawPhone = extractCleanMobile(v);
+            break;
+          }
+        }
+      }
+      if (!rawPhone) {
+        rawPhone = extractCleanMobile(item['Worker Phone Number (if available)'] || item['Worker Phone Number'] || item['Mobile Number'] || item['colQ'] || item['Col Q'] || '');
+      }
       const rawVillage = String(item['Village Name'] || item['colV'] || '').trim();
       const rawSansad = String(item['Sansad Name & No'] || item['Sansad Name'] || item['colB'] || '').trim();
       const rawDate = item['If Y , then record Date of e-KYC Successfully Done'] || item['eKycDate'] || item['colS'] || '';

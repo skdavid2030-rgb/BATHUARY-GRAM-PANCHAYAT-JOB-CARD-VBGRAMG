@@ -420,13 +420,9 @@ export const JobCardA5PrintModal: React.FC<JobCardA5PrintModalProps> = ({
           {/* Under Table - Official Certification Note */}
           <div className="p-1.5 bg-slate-50 border border-slate-200 rounded text-[9px] text-slate-600 leading-tight mb-2">
             <div>
-              <strong>Declaration & Note:</strong> This document certifies that the aforementioned Job Card and Family Members are officially registered under:
+              <strong>Declaration & Note:</strong> This document certifies that the aforementioned Job Card and Family Members are officially registered under Bathuary Gram Panchayat
             </div>
-            <div className="font-bold text-slate-900 my-0.5 leading-tight">
-              <div>Bathuary Gram Panchayat</div>
-              <div>Egra-II Development Block</div>
-            </div>
-            <div>
+            <div className="mt-0.5">
               The biometric e-KYC verification and ABPS statuses are verified through official records.
             </div>
           </div>

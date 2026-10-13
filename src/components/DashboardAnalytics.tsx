@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { AnalyticsData, VillageStat, BeneficiaryRow, ReportCategoryFilter } from '../types';
 import { normalizeJobCardBookDelivered } from '../utils/jobCardDeliveryNormalizer';
+import { convertBengaliNumerals } from '../utils/beneficiaryHealer';
 
 interface DashboardProps {
   analytics: AnalyticsData;
@@ -87,16 +88,27 @@ export const DashboardAnalytics: React.FC<DashboardProps> = ({
   // Filtered unique cards for the drill-down modal
   const filteredModalCards = useMemo(() => {
     if (!modalSearch.trim()) return uniqueJobCardList;
-    const q = modalSearch.toLowerCase().trim();
-    return uniqueJobCardList.filter(r => 
-      (r.colH && r.colH.toLowerCase().includes(q)) ||
-      (r.colAG && r.colAG.toLowerCase().includes(q)) ||
-      (r.colAF && r.colAF.toLowerCase().includes(q)) ||
-      (r.colV && r.colV.toLowerCase().includes(q)) ||
-      (r.colB && r.colB.toLowerCase().includes(q)) ||
-      (r.colP && r.colP.toLowerCase().includes(q)) ||
-      (r.colJ && r.colJ.toLowerCase().includes(q))
-    );
+    const converted = convertBengaliNumerals(modalSearch).toLowerCase().trim();
+    const qDigits = converted.replace(/\D/g, '');
+    const mobileDigits = qDigits.length === 12 && qDigits.startsWith('91') && /^[6-9]/.test(qDigits.slice(2))
+      ? qDigits.slice(2)
+      : qDigits.length === 11 && qDigits.startsWith('0') && /^[6-9]/.test(qDigits.slice(1))
+        ? qDigits.slice(1)
+        : qDigits;
+
+    return uniqueJobCardList.filter(r => {
+      if (r.colH && r.colH.toLowerCase().includes(converted)) return true;
+      if (r.colAG && r.colAG.toLowerCase().includes(converted)) return true;
+      if (r.colAF && r.colAF.toLowerCase().includes(converted)) return true;
+      if (r.colV && r.colV.toLowerCase().includes(converted)) return true;
+      if (r.colB && r.colB.toLowerCase().includes(converted)) return true;
+      if (r.colJ && r.colJ.toLowerCase().includes(converted)) return true;
+      if (r.colP && r.colP.toLowerCase().includes(converted)) return true;
+      if (r.colQ && r.colQ.toLowerCase().includes(converted)) return true;
+      if (qDigits.length >= 3 && r.colP && r.colP.replace(/\D/g, '').includes(qDigits)) return true;
+      if (mobileDigits.length >= 4 && r.colQ && r.colQ.replace(/\D/g, '').includes(mobileDigits)) return true;
+      return false;
+    });
   }, [uniqueJobCardList, modalSearch]);
 
   const filteredVillages = useMemo(() => {

@@ -266,8 +266,9 @@ export default function App() {
     // Instant load from IndexedDB cache with 0 delay (even on Netlify refresh)
     loadCachedBeneficiaries().then(cached => {
       if (isMounted && cached && cached.length > 0) {
-        setBeneficiaries(cached);
-        updateSansadListFromRecords(cached);
+        const healed = cached.map(healBeneficiaryRecord);
+        setBeneficiaries(healed);
+        updateSansadListFromRecords(healed);
       }
     });
 
